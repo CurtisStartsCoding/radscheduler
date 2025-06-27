@@ -17,6 +17,7 @@ const hl7Routes = require('./routes/hl7');
 const appointmentRoutes = require('./routes/appointments');
 const analyticsRoutes = require('./routes/analytics');
 const demoRoutes = require('./routes/demo');
+const clinicalRoutes = require('./routes/clinical-integration');
 
 const app = express();
 const httpServer = createServer(app);
@@ -73,6 +74,7 @@ requiredEnv.forEach((key) => {
 app.use('/api/hl7', hl7Routes);
 app.use('/api/appointments', appointmentRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/clinical', clinicalRoutes);
 
 // Only mount demo endpoints in non-production
 if (process.env.NODE_ENV !== 'production') {
