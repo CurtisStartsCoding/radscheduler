@@ -1,0 +1,59 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: radscheduler
+      POSTGRES_USER: raduser
+      POSTGRES_PASSWORD: radpass123
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U raduser"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  mirth:
+    image: nextgenhealthcare/connect:4.4.0
+    ports:
+      - "8443:8443"  # Web UI (HTTPS)
+      - "8661:8661"  # HL7 listener
+      - "8080:8080"  # HTTP listener
+    environment:
+      - DATABASE=postgres
+      - DATABASE_URL=jdbc:postgresql://postgres:5432/mirthdb
+      - DATABASE_USERNAME=raduser
+      - DATABASE_PASSWORD=radpass123
+    volumes:
+      - mirth_data:/opt/connect/appdata
+      - ./mirth/channels:/opt/connect/channels
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/system/info"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+volumes:
+  postgres_data:
+  redis_data:
+  mirth_data:
