@@ -4,11 +4,58 @@ const hl7Processor = require('../services/hl7-processor');
 const { createAppointment, getAppointments } = require('../db/queries');
 const { sendSMS } = require('../services/notifications');
 const logger = require('../utils/logger');
+const Joi = require('joi');
+
+// Validation schemas
+const clinicalDecisionSchema = Joi.object({
+  patientId: Joi.string().optional(),
+  patientName: Joi.string().optional(),
+  patientPhone: Joi.string().pattern(/^\+?[1-9]\d{1,14}$/).optional(),
+  clinicalData: Joi.object({
+    riskScore: Joi.number().min(0).max(100).optional(),
+    modality: Joi.string().optional(),
+    recommendedProtocol: Joi.string().optional(),
+    referringPhysician: Joi.string().optional(),
+    urgency: Joi.string().valid('routine', 'urgent', 'emergency').optional(),
+    analysis: Joi.string().optional(),
+    recommendations: Joi.array().items(Joi.string()).optional()
+  }).optional(),
+  schedulingPreferences: Joi.object({
+    preferredDateTime: Joi.string().isoDate().optional()
+  }).optional(),
+  source: Joi.string().optional()
+});
+
+const availableSlotsSchema = Joi.object({
+  modality: Joi.string().optional(),
+  date: Joi.string().isoDate().optional(),
+  duration: Joi.number().integer().min(15).max(120).default(30)
+});
+
+const clinicalSMSSchema = Joi.object({
+  patientPhone: Joi.string().pattern(/^\+?[1-9]\d{1,14}$/).required(),
+  clinicalData: Joi.object({
+    modality: Joi.string().required(),
+    riskScore: Joi.number().min(0).max(100).optional(),
+    recommendedProtocol: Joi.string().optional(),
+    urgency: Joi.string().valid('routine', 'urgent', 'emergency').optional()
+  }).required(),
+  bookingUrl: Joi.string().uri().required(),
+  appointmentId: Joi.string().optional()
+});
+
+const clinicalAnalyticsSchema = Joi.object({
+  date: Joi.string().isoDate().optional(),
+  modality: Joi.string().optional()
+});
 
 // Clinical Decision Support Platform Integration
 // This endpoint receives clinical decisions and creates appointments
 
 router.post('/clinical-decision', async (req, res) => {
+  const { error } = clinicalDecisionSchema.validate(req.body);
+  if (error) return res.status(400).json({ success: false, error: error.message });
+  
   try {
     const {
       patientId,
@@ -86,6 +133,9 @@ Book now: https://patient-portal.com/book/${result.appointment.id}`;
 
 // Get available slots for clinical scheduling
 router.get('/available-slots', async (req, res) => {
+  const { error } = availableSlotsSchema.validate(req.query);
+  if (error) return res.status(400).json({ success: false, error: error.message });
+  
   try {
     const { modality, date, duration = 30 } = req.query;
     
@@ -115,6 +165,9 @@ router.get('/available-slots', async (req, res) => {
 
 // Enhanced SMS with clinical context
 router.post('/send-clinical-sms', async (req, res) => {
+  const { error } = clinicalSMSSchema.validate(req.body);
+  if (error) return res.status(400).json({ success: false, error: error.message });
+  
   try {
     const {
       patientPhone,
@@ -153,6 +206,9 @@ Questions? Call us at ${process.env.DEMO_PHONE}`;
 
 // Get clinical analytics
 router.get('/clinical-analytics', async (req, res) => {
+  const { error } = clinicalAnalyticsSchema.validate(req.query);
+  if (error) return res.status(400).json({ success: false, error: error.message });
+  
   try {
     const { date, modality } = req.query;
     

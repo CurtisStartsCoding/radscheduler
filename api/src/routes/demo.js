@@ -3,9 +3,28 @@ const router = express.Router();
 const { broadcastEvent } = require('../services/websocket');
 const { sendBulkSMS } = require('../services/notifications');
 const logger = require('../utils/logger');
+const Joi = require('joi');
+
+// Validation schemas
+const scenarioSchema = Joi.string().valid('dramatic-save', 'efficiency-boost', 'bulk-sms').required();
+
+const bulkSMSSchema = Joi.object({
+  phoneNumbers: Joi.array().items(
+    Joi.string().pattern(/^\+?[1-9]\d{1,14}$/)
+  ).min(1).required()
+});
 
 // Trigger demo scenarios
 router.post('/scenario/:name', async (req, res) => {
+  const { error: paramError } = scenarioSchema.validate(req.params.name);
+  if (paramError) return res.status(400).json({ success: false, error: paramError.message });
+  
+  // Validate body for bulk-sms scenario
+  if (req.params.name === 'bulk-sms') {
+    const { error: bodyError } = bulkSMSSchema.validate(req.body);
+    if (bodyError) return res.status(400).json({ success: false, error: bodyError.message });
+  }
+  
   try {
     const { name } = req.params;
     

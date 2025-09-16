@@ -18,6 +18,9 @@ const appointmentRoutes = require('./routes/appointments');
 const analyticsRoutes = require('./routes/analytics');
 const demoRoutes = require('./routes/demo');
 const clinicalRoutes = require('./routes/clinical-integration');
+const authRoutes = require('./routes/auth');
+const avreoRoutes = require('./routes/avreo-integration');
+const patientSchedulingRoutes = require('./routes/patient-scheduling');
 
 const app = express();
 const httpServer = createServer(app);
@@ -32,16 +35,24 @@ const io = new Server(httpServer, {
 app.use(helmet());
 app.use(compression());
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  origin: [
+    'http://localhost:3000',
+    'http://localhost:3002'
+  ],
   credentials: true
 }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// Rate limiting
+// Rate limiting - more lenient for development/testing
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100 // limit each IP to 100 requests per windowMs
+  max: process.env.NODE_ENV === 'production' ? 100 : 1000, // 1000 requests in dev, 100 in prod
+  message: 'Too many requests, please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false,
+  // Skip rate limiting for health checks
+  skip: (req) => req.path === '/health'
 });
 app.use('/api/', limiter);
 
@@ -71,10 +82,13 @@ requiredEnv.forEach((key) => {
 });
 
 // Routes
+app.use('/api/auth', authRoutes);
 app.use('/api/hl7', hl7Routes);
 app.use('/api/appointments', appointmentRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/clinical', clinicalRoutes);
+app.use('/api/avreo', avreoRoutes);
+app.use('/api/patient', patientSchedulingRoutes);
 
 // Only mount demo endpoints in non-production
 if (process.env.NODE_ENV !== 'production') {

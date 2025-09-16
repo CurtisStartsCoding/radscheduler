@@ -3,9 +3,24 @@ const router = express.Router();
 const aiScheduler = require('../services/ai-scheduler');
 const { getAppointments, getStats } = require('../db/queries');
 const logger = require('../utils/logger');
+const Joi = require('joi');
+
+// Validation schemas
+const optimizeSchema = Joi.object({
+  date: Joi.string().isoDate().optional(),
+  modality: Joi.string().optional()
+});
+
+const utilizationSchema = Joi.object({
+  date: Joi.string().isoDate().optional(),
+  modality: Joi.string().optional()
+});
 
 // Get schedule optimization
 router.post('/optimize', async (req, res) => {
+  const { error } = optimizeSchema.validate(req.body);
+  if (error) return res.status(400).json({ success: false, error: error.message });
+  
   try {
     const { date, modality } = req.body;
     
@@ -29,6 +44,9 @@ router.post('/optimize', async (req, res) => {
 
 // Get utilization metrics
 router.get('/utilization', async (req, res) => {
+  const { error } = utilizationSchema.validate(req.query);
+  if (error) return res.status(400).json({ success: false, error: error.message });
+  
   try {
     const { date, modality } = req.query;
     

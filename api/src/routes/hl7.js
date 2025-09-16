@@ -2,9 +2,34 @@ const express = require('express');
 const router = express.Router();
 const hl7Processor = require('../services/hl7-processor');
 const logger = require('../utils/logger');
+const Joi = require('joi');
+
+// Validation schemas
+const hl7AppointmentSchema = Joi.object({
+  patientId: Joi.string().required(),
+  patientName: Joi.string().required(),
+  patientPhone: Joi.string().pattern(/^\+?[1-9]\d{1,14}$/).optional(),
+  modality: Joi.string().required(),
+  studyType: Joi.string().required(),
+  datetime: Joi.string().isoDate().required(),
+  referringPhysician: Joi.string().required(),
+  urgency: Joi.string().valid('routine', 'urgent', 'emergency').default('routine')
+}).unknown(true); // Allow additional fields
+
+const rawHL7Schema = Joi.string().min(10).required();
+
+const hl7SimulateSchema = Joi.object({
+  patientName: Joi.string().optional(),
+  modality: Joi.string().optional(),
+  datetime: Joi.string().isoDate().optional(),
+  scenario: Joi.string().valid('dramatic_save', 'efficiency_boost', 'bulk_processing').optional()
+});
 
 // Main HL7 endpoint - receives messages from Mirth
 router.post('/appointment', async (req, res) => {
+  const { error } = hl7AppointmentSchema.validate(req.body);
+  if (error) return res.status(400).json({ success: false, error: error.message });
+  
   try {
     logger.info('HL7 appointment endpoint hit', {
       contentType: req.headers['content-type'],
@@ -31,6 +56,9 @@ router.post('/appointment', async (req, res) => {
 
 // Raw HL7 endpoint for direct integration
 router.post('/raw', async (req, res) => {
+  const { error } = rawHL7Schema.validate(req.body);
+  if (error) return res.status(400).json({ success: false, error: error.message });
+  
   try {
     const rawHL7 = req.body;
     logger.info('Raw HL7 message received', {
@@ -57,6 +85,9 @@ router.post('/raw', async (req, res) => {
 
 // Simulate HL7 message for testing
 router.post('/simulate', async (req, res) => {
+  const { error } = hl7SimulateSchema.validate(req.body);
+  if (error) return res.status(400).json({ success: false, error: error.message });
+  
   try {
     const { patientName, modality, datetime, scenario } = req.body;
     

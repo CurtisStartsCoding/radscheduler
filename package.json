@@ -18,10 +18,18 @@
     "reset-demo": "cd api && npm run db:reset && npm run seed:demo",
     "load-test": "cd api && npm run test:load"
   },
-  "keywords": ["healthcare", "hl7", "scheduling", "radiology"],
+  "keywords": [
+    "healthcare",
+    "hl7",
+    "scheduling",
+    "radiology"
+  ],
   "author": "RadScheduler Team",
   "license": "MIT",
   "devDependencies": {
     "concurrently": "^8.2.0"
+  },
+  "dependencies": {
+    "axios": "^1.10.0"
   }
 }

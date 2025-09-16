@@ -75,6 +75,7 @@ temp/
 # Build outputs
 dist/
 build/
+web/.next/
 
 # API keys and secrets
 api/.env
