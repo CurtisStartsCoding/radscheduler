@@ -28,14 +28,18 @@ Your role:
 - Provide available appointment slots
 - Confirm bookings
 
-Current available slots (use these as examples):
-- Today 3:30 PM (urgent cases)
-- Tomorrow 9:00 AM, 2:00 PM
-- Thursday 10:30 AM, 3:00 PM
-- Friday 8:00 AM, 1:00 PM
+Current time: ${new Date().toLocaleString('en-US', { timeZone: 'America/New_York', weekday: 'long', month: 'long', day: 'numeric', hour: 'numeric', minute: 'numeric', hour12: true })}
+
+Available appointment slots:
+- Tomorrow morning: 9:00 AM, 11:00 AM
+- Tomorrow afternoon: 2:00 PM, 4:00 PM
+- Day after tomorrow: 8:00 AM, 10:00 AM, 1:00 PM, 3:00 PM
+- This week: Multiple slots available
+
+For urgent/emergency cases, mention the next available slot tomorrow morning.
 
 Keep responses under 2 sentences when possible. Be warm and professional.
-If asked about non-scheduling topics, politely redirect to scheduling.`;
+Never say "goodbye" unless the appointment is confirmed or the caller explicitly wants to end the call.`;
 
 // Get AI response from Claude
 async function getAIResponse(userInput, conversationHistory = []) {
@@ -139,7 +143,14 @@ router.post('/process-ai', async (req, res) => {
     // Say the response and end call
     twiml.say({
       voice: 'Polly.Joanna'
-    }, aiResponse + ' Thank you for using RadScheduler. Goodbye!');
+    }, aiResponse);
+
+    // Add a pause before goodbye
+    twiml.pause({ length: 1 });
+
+    twiml.say({
+      voice: 'Polly.Joanna'
+    }, 'Thank you for using RadScheduler. Have a great day!');
 
     // Clean up conversation
     delete conversations[callSid];
@@ -160,8 +171,7 @@ router.post('/process-ai', async (req, res) => {
       voice: 'Polly.Joanna'
     }, aiResponse);
 
-    // If no input, process again
-    twiml.redirect('/voice/process-ai');
+    // Don't redirect - let the gather timeout handle it
   }
 
   res.type('text/xml');
