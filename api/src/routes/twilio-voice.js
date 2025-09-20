@@ -17,9 +17,9 @@ router.post('/incoming', (req, res) => {
   });
 
   gather.say({
-    voice: 'alice',
+    voice: 'Polly.Joanna',
     language: 'en-US'
-  }, 'Welcome to RadScheduler AI booking system. How can I help you schedule your radiology appointment today? You can say things like: I need an MRI, or I want to schedule a CT scan.');
+  }, 'Welcome to RadScheduler. I can help you book your radiology appointment. Just tell me what type of scan you need, like MRI, CT scan, or ultrasound.');
 
   // If no input, repeat
   twiml.redirect('/voice/incoming');
@@ -41,8 +41,8 @@ router.post('/process', async (req, res) => {
 
   if (lowerSpeech.includes('mri') || lowerSpeech.includes('magnetic')) {
     twiml.say({
-      voice: 'alice'
-    }, 'I can help you schedule an MRI. We have an opening tomorrow at 2 PM. Would you like me to book that for you?');
+      voice: 'Polly.Joanna'
+    }, 'I can help you schedule an MRI. We have an opening tomorrow at 2 PM. Would you like to book that?');
 
     const gather = twiml.gather({
       input: 'speech',
@@ -53,8 +53,8 @@ router.post('/process', async (req, res) => {
 
   } else if (lowerSpeech.includes('ct') || lowerSpeech.includes('cat scan')) {
     twiml.say({
-      voice: 'alice'
-    }, 'I can schedule a CT scan for you. We have availability this Friday at 10 AM. Would that work for you?');
+      voice: 'Polly.Joanna'
+    }, 'I can schedule a CT scan for you. We have availability this Friday at 10 AM. Would that work?');
 
     const gather = twiml.gather({
       input: 'speech',
@@ -65,7 +65,7 @@ router.post('/process', async (req, res) => {
 
   } else if (lowerSpeech.includes('ultrasound')) {
     twiml.say({
-      voice: 'alice'
+      voice: 'Polly.Joanna'
     }, 'For ultrasound appointments, we have openings tomorrow at 9 AM or Thursday at 3 PM. Which would you prefer?');
 
     const gather = twiml.gather({
@@ -77,8 +77,8 @@ router.post('/process', async (req, res) => {
 
   } else {
     twiml.say({
-      voice: 'alice'
-    }, 'I can help you schedule radiology appointments. Please tell me what type of scan you need. For example, say MRI, CT scan, or ultrasound.');
+      voice: 'Polly.Joanna'
+    }, 'I can help you schedule radiology appointments. Please tell me what type of scan you need.');
     twiml.redirect('/voice/incoming');
   }
 
@@ -94,19 +94,19 @@ router.post('/confirm', async (req, res) => {
 
   if (lowerSpeech.includes('yes') || lowerSpeech.includes('book') || lowerSpeech.includes('confirm')) {
     twiml.say({
-      voice: 'alice'
-    }, 'Perfect! Your appointment has been scheduled. You will receive a confirmation text message shortly. Thank you for using RadScheduler. Have a great day!');
+      voice: 'Polly.Joanna'
+    }, 'Perfect! Your appointment has been scheduled. You'll receive a confirmation text shortly. Thank you for using RadScheduler.');
 
     // TODO: Actually create appointment and send SMS
 
   } else if (lowerSpeech.includes('no') || lowerSpeech.includes('cancel')) {
     twiml.say({
-      voice: 'alice'
-    }, 'No problem. Feel free to call back anytime to schedule your appointment. Have a great day!');
+      voice: 'Polly.Joanna'
+    }, 'No problem. Feel free to call back anytime to schedule your appointment. Goodbye!');
   } else {
     twiml.say({
-      voice: 'alice'
-    }, 'I didn\'t understand that. Please say yes to confirm or no to cancel.');
+      voice: 'Polly.Joanna'
+    }, 'I didn\'t catch that. Please say yes to confirm or no to cancel.');
     twiml.redirect('/voice/process');
   }
 
