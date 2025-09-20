@@ -95,7 +95,7 @@ router.post('/confirm', async (req, res) => {
   if (lowerSpeech.includes('yes') || lowerSpeech.includes('book') || lowerSpeech.includes('confirm')) {
     twiml.say({
       voice: 'Polly.Joanna'
-    }, 'Perfect! Your appointment has been scheduled. You'll receive a confirmation text shortly. Thank you for using RadScheduler.');
+    }, 'Perfect! Your appointment has been scheduled. You will receive a confirmation text shortly. Thank you for using RadScheduler.');
 
     // TODO: Actually create appointment and send SMS
 
@@ -106,7 +106,7 @@ router.post('/confirm', async (req, res) => {
   } else {
     twiml.say({
       voice: 'Polly.Joanna'
-    }, 'I didn\'t catch that. Please say yes to confirm or no to cancel.');
+    }, 'I did not catch that. Please say yes to confirm or no to cancel.');
     twiml.redirect('/voice/process');
   }
 
