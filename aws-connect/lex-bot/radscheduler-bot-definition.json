@@ -1,0 +1,372 @@
+{
+  "name": "RadSchedulerBot",
+  "description": "AI-powered radiology appointment scheduling bot for AWS Connect",
+  "version": "1.0",
+  "dataPrivacy": {
+    "childDirected": false
+  },
+  "idleSessionTTLInSeconds": 300,
+  "roleArn": "arn:aws:iam::ACCOUNT:role/RadSchedulerLexRole",
+  "intents": [
+    {
+      "intentName": "BookAppointment",
+      "description": "Books a new radiology appointment",
+      "sampleUtterances": [
+        {
+          "utterance": "I need to book an {ProcedureType}"
+        },
+        {
+          "utterance": "Schedule {ProcedureType} for {Date}"
+        },
+        {
+          "utterance": "I'd like to make an appointment for {ProcedureType}"
+        },
+        {
+          "utterance": "Book {ProcedureType} appointment"
+        },
+        {
+          "utterance": "Can I get an {ProcedureType} on {Date}"
+        },
+        {
+          "utterance": "I need a {ProcedureType} scan"
+        },
+        {
+          "utterance": "Schedule radiology appointment"
+        }
+      ],
+      "slots": [
+        {
+          "slotName": "ProcedureType",
+          "description": "Type of radiology procedure",
+          "slotType": "RadiologyProcedure",
+          "valueElicitationPrompt": {
+            "messages": [
+              {
+                "contentType": "PlainText",
+                "content": "What type of scan do you need? For example, MRI, CT scan, X-ray, or ultrasound."
+              }
+            ],
+            "maxAttempts": 2
+          },
+          "priority": 1,
+          "required": true
+        },
+        {
+          "slotName": "Date",
+          "description": "Preferred appointment date",
+          "slotType": "AMAZON.Date",
+          "valueElicitationPrompt": {
+            "messages": [
+              {
+                "contentType": "PlainText",
+                "content": "What date would you prefer for your {ProcedureType}?"
+              }
+            ],
+            "maxAttempts": 2
+          },
+          "priority": 2,
+          "required": true
+        },
+        {
+          "slotName": "Time",
+          "description": "Preferred appointment time",
+          "slotType": "AMAZON.Time",
+          "valueElicitationPrompt": {
+            "messages": [
+              {
+                "contentType": "PlainText",
+                "content": "What time works best for you? We have slots from 7 AM to 7 PM."
+              }
+            ],
+            "maxAttempts": 2
+          },
+          "priority": 3,
+          "required": false
+        },
+        {
+          "slotName": "PatientPhone",
+          "description": "Patient phone number for confirmation",
+          "slotType": "AMAZON.PhoneNumber",
+          "valueElicitationPrompt": {
+            "messages": [
+              {
+                "contentType": "PlainText",
+                "content": "What's the best phone number to send your confirmation to?"
+              }
+            ],
+            "maxAttempts": 2
+          },
+          "priority": 4,
+          "required": true
+        }
+      ],
+      "fulfillmentActivity": {
+        "type": "CodeHook",
+        "codeHook": {
+          "uri": "arn:aws:lambda:us-east-1:ACCOUNT:function:radscheduler-book-appointment",
+          "messageVersion": "1.0"
+        }
+      },
+      "confirmationPrompt": {
+        "messages": [
+          {
+            "contentType": "PlainText",
+            "content": "I have you down for a {ProcedureType} on {Date} at {Time}. Should I confirm this appointment?"
+          }
+        ],
+        "maxAttempts": 2
+      },
+      "rejectionStatement": {
+        "messages": [
+          {
+            "contentType": "PlainText",
+            "content": "No problem. Let me know if you'd like to try a different date or time."
+          }
+        ]
+      }
+    },
+    {
+      "intentName": "CheckAvailability",
+      "description": "Checks available appointment slots",
+      "sampleUtterances": [
+        {
+          "utterance": "What times are available for {ProcedureType}"
+        },
+        {
+          "utterance": "When can I get an {ProcedureType}"
+        },
+        {
+          "utterance": "Check availability for {ProcedureType}"
+        },
+        {
+          "utterance": "Do you have any openings for {ProcedureType}"
+        },
+        {
+          "utterance": "What's the earliest {ProcedureType} available"
+        }
+      ],
+      "slots": [
+        {
+          "slotName": "ProcedureType",
+          "description": "Type of radiology procedure",
+          "slotType": "RadiologyProcedure",
+          "valueElicitationPrompt": {
+            "messages": [
+              {
+                "contentType": "PlainText",
+                "content": "Which type of scan are you checking availability for?"
+              }
+            ],
+            "maxAttempts": 2
+          },
+          "priority": 1,
+          "required": true
+        },
+        {
+          "slotName": "DateRange",
+          "description": "Date range to check",
+          "slotType": "AMAZON.Date",
+          "valueElicitationPrompt": {
+            "messages": [
+              {
+                "contentType": "PlainText",
+                "content": "What date or week would you like me to check?"
+              }
+            ],
+            "maxAttempts": 2
+          },
+          "priority": 2,
+          "required": false
+        }
+      ],
+      "fulfillmentActivity": {
+        "type": "CodeHook",
+        "codeHook": {
+          "uri": "arn:aws:lambda:us-east-1:ACCOUNT:function:radscheduler-check-availability",
+          "messageVersion": "1.0"
+        }
+      }
+    },
+    {
+      "intentName": "RescheduleAppointment",
+      "description": "Reschedules an existing appointment",
+      "sampleUtterances": [
+        {
+          "utterance": "I need to reschedule my {ProcedureType}"
+        },
+        {
+          "utterance": "Change my appointment"
+        },
+        {
+          "utterance": "Can I move my {ProcedureType} to {Date}"
+        },
+        {
+          "utterance": "Reschedule appointment"
+        }
+      ],
+      "slots": [
+        {
+          "slotName": "ConfirmationNumber",
+          "description": "Existing appointment confirmation number",
+          "slotType": "AMAZON.AlphaNumeric",
+          "valueElicitationPrompt": {
+            "messages": [
+              {
+                "contentType": "PlainText",
+                "content": "Do you have your confirmation number? It starts with RAD."
+              }
+            ],
+            "maxAttempts": 2
+          },
+          "priority": 1,
+          "required": true
+        },
+        {
+          "slotName": "NewDate",
+          "description": "New appointment date",
+          "slotType": "AMAZON.Date",
+          "valueElicitationPrompt": {
+            "messages": [
+              {
+                "contentType": "PlainText",
+                "content": "What new date would work better for you?"
+              }
+            ],
+            "maxAttempts": 2
+          },
+          "priority": 2,
+          "required": true
+        }
+      ],
+      "fulfillmentActivity": {
+        "type": "CodeHook",
+        "codeHook": {
+          "uri": "arn:aws:lambda:us-east-1:ACCOUNT:function:radscheduler-reschedule",
+          "messageVersion": "1.0"
+        }
+      }
+    },
+    {
+      "intentName": "CancelAppointment",
+      "description": "Cancels an existing appointment",
+      "sampleUtterances": [
+        {
+          "utterance": "Cancel my appointment"
+        },
+        {
+          "utterance": "I need to cancel my {ProcedureType}"
+        },
+        {
+          "utterance": "Remove my appointment"
+        },
+        {
+          "utterance": "Cancel {ProcedureType} appointment"
+        }
+      ],
+      "slots": [
+        {
+          "slotName": "ConfirmationNumber",
+          "description": "Appointment confirmation number",
+          "slotType": "AMAZON.AlphaNumeric",
+          "valueElicitationPrompt": {
+            "messages": [
+              {
+                "contentType": "PlainText",
+                "content": "What's your confirmation number? It should start with RAD."
+              }
+            ],
+            "maxAttempts": 2
+          },
+          "priority": 1,
+          "required": true
+        }
+      ],
+      "fulfillmentActivity": {
+        "type": "CodeHook",
+        "codeHook": {
+          "uri": "arn:aws:lambda:us-east-1:ACCOUNT:function:radscheduler-cancel",
+          "messageVersion": "1.0"
+        }
+      },
+      "confirmationPrompt": {
+        "messages": [
+          {
+            "contentType": "PlainText",
+            "content": "Are you sure you want to cancel this appointment?"
+          }
+        ],
+        "maxAttempts": 2
+      }
+    },
+    {
+      "intentName": "TransferToAgent",
+      "description": "Transfer to human agent",
+      "sampleUtterances": [
+        {
+          "utterance": "Talk to a person"
+        },
+        {
+          "utterance": "I need to speak with someone"
+        },
+        {
+          "utterance": "Transfer me to an agent"
+        },
+        {
+          "utterance": "Human please"
+        },
+        {
+          "utterance": "Get me a real person"
+        }
+      ],
+      "fulfillmentActivity": {
+        "type": "ReturnIntent"
+      }
+    }
+  ],
+  "slotTypes": [
+    {
+      "name": "RadiologyProcedure",
+      "description": "Types of radiology procedures",
+      "valueSelectionStrategy": "TOP_RESOLUTION",
+      "slotTypeValues": [
+        {
+          "value": "MRI",
+          "synonyms": ["MRI scan", "magnetic resonance imaging", "MR scan"]
+        },
+        {
+          "value": "CT",
+          "synonyms": ["CT scan", "CAT scan", "computed tomography", "CAT"]
+        },
+        {
+          "value": "X-ray",
+          "synonyms": ["xray", "radiograph", "x ray"]
+        },
+        {
+          "value": "Ultrasound",
+          "synonyms": ["sonogram", "ultrasonography", "US"]
+        },
+        {
+          "value": "Mammogram",
+          "synonyms": ["mammography", "breast scan", "breast x-ray"]
+        },
+        {
+          "value": "PET",
+          "synonyms": ["PET scan", "positron emission tomography"]
+        },
+        {
+          "value": "Nuclear",
+          "synonyms": ["nuclear medicine", "nuclear scan"]
+        },
+        {
+          "value": "Fluoroscopy",
+          "synonyms": ["fluoro", "fluoroscopic"]
+        }
+      ]
+    }
+  ],
+  "voiceSettings": {
+    "voiceId": "Joanna",
+    "engine": "neural"
+  },
+  "locale": "en_US"
+}

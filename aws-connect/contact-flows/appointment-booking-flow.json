@@ -1,0 +1,121 @@
+{
+  "Version": "2019-10-30",
+  "StartAction": "greeting",
+  "Metadata": {
+    "entryPointPosition": {"x": 20, "y": 20},
+    "ActionMetadata": {
+      "greeting": {
+        "position": {"x": 200, "y": 20}
+      }
+    }
+  },
+  "Actions": [
+    {
+      "Identifier": "greeting",
+      "Type": "MessageParticipant",
+      "Transitions": {
+        "NextAction": "get-customer-input"
+      },
+      "Parameters": {
+        "Text": "Welcome to Memorial Radiology scheduling. I'm your AI assistant. You can say things like 'Book an MRI' or 'Schedule an X-ray'. How can I help you today?"
+      }
+    },
+    {
+      "Identifier": "get-customer-input",
+      "Type": "ConnectParticipantWithLexBot",
+      "Transitions": {
+        "NextAction": "check-bot-response",
+        "Errors": [
+          {
+            "ErrorType": "NoMatchingError",
+            "NextAction": "transfer-to-agent"
+          }
+        ]
+      },
+      "Parameters": {
+        "LexV2Bot": {
+          "AliasArn": "arn:aws:lex:us-east-1:ACCOUNT:bot-alias/RADSCHEDULER_BOT/PROD"
+        }
+      }
+    },
+    {
+      "Identifier": "check-bot-response",
+      "Type": "CheckAttribute",
+      "Transitions": {
+        "Conditions": [
+          {
+            "Condition": {
+              "Operator": "Equals",
+              "Operand": "BookingConfirmed"
+            },
+            "NextAction": "booking-success"
+          },
+          {
+            "Condition": {
+              "Operator": "Equals",
+              "Operand": "TransferRequested"
+            },
+            "NextAction": "transfer-to-agent"
+          }
+        ],
+        "Default": "get-customer-input"
+      },
+      "Parameters": {
+        "Attribute": "LexIntent"
+      }
+    },
+    {
+      "Identifier": "booking-success",
+      "Type": "MessageParticipant",
+      "Transitions": {
+        "NextAction": "send-sms-confirmation"
+      },
+      "Parameters": {
+        "Text": "Perfect! Your appointment has been scheduled. You'll receive an SMS confirmation shortly with all the details and any preparation instructions."
+      }
+    },
+    {
+      "Identifier": "send-sms-confirmation",
+      "Type": "InvokeAWSLambdaFunction",
+      "Transitions": {
+        "NextAction": "end-call-success"
+      },
+      "Parameters": {
+        "FunctionArn": "arn:aws:lambda:us-east-1:ACCOUNT:function:radscheduler-send-confirmation",
+        "InvocationTimeLimitSeconds": 8
+      }
+    },
+    {
+      "Identifier": "transfer-to-agent",
+      "Type": "MessageParticipant",
+      "Transitions": {
+        "NextAction": "set-queue"
+      },
+      "Parameters": {
+        "Text": "I'll connect you with a scheduling specialist who can better assist you. Please hold for just a moment."
+      }
+    },
+    {
+      "Identifier": "set-queue",
+      "Type": "SetQueue",
+      "Transitions": {
+        "NextAction": "transfer-to-queue"
+      },
+      "Parameters": {
+        "QueueId": "arn:aws:connect:us-east-1:ACCOUNT:instance/INSTANCE/queue/SCHEDULING_QUEUE"
+      }
+    },
+    {
+      "Identifier": "transfer-to-queue",
+      "Type": "TransferContactToQueue",
+      "Transitions": {},
+      "Parameters": {}
+    },
+    {
+      "Identifier": "end-call-success",
+      "Type": "DisconnectParticipant",
+      "Transitions": {},
+      "Parameters": {}
+    }
+  ]
+}
