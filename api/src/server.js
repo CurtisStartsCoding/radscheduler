@@ -24,6 +24,7 @@ const patientSchedulingRoutes = require('./routes/patient-scheduling');
 const voiceIntegrationRoutes = require('./routes/voice-integration'); // Voice AI System Integration
 const organizationRoutes = require('./routes/organizations'); // Multi-tenant organizations
 const twilioVoiceRoutes = require('./routes/twilio-voice-ai'); // AI-powered Twilio voice handler
+const retellRoutes = require('./routes/retell-webhook'); // Retell AI voice system
 
 const app = express();
 const httpServer = createServer(app);
@@ -104,6 +105,7 @@ app.use('/api/patient', patientSchedulingRoutes);
 app.use('/api/voice', voiceIntegrationRoutes); // Voice AI System endpoints (separate system)
 app.use('/api/organizations', organizationRoutes); // Multi-tenant organization management
 app.use('/voice', twilioVoiceRoutes); // Twilio voice webhook handler
+app.use('/api/retell', retellRoutes); // Retell AI voice system
 
 // Only mount demo endpoints in non-production
 if (process.env.NODE_ENV !== 'production') {
