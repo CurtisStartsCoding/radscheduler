@@ -123,29 +123,47 @@ router.post('/process-ai', async (req, res) => {
   logger.info('Speech input:', { callSid, speech: speechResult });
 
   if (!speechResult) {
-    // Check if we're waiting for important info like name
+    // Check if we're waiting for important info
     const conversation = conversations[callSid];
-    const lastResponse = conversation?.history?.slice(-1)[0]?.content || '';
+    // Get the last AI response (assistant role)
+    const lastAIResponse = conversation?.history?.filter(m => m.role === 'assistant').slice(-1)[0]?.content || '';
 
-    if (lastResponse.toLowerCase().includes('name') ||
-        lastResponse.toLowerCase().includes('spell')) {
-      // Give them more time for names
+    logger.info('No speech detected', { callSid, lastAIResponse: lastAIResponse.substring(0, 50) });
+
+    // Check if we just asked a question that needs an answer
+    if (lastAIResponse.toLowerCase().includes('?') ||
+        lastAIResponse.toLowerCase().includes('tell me') ||
+        lastAIResponse.toLowerCase().includes('what type') ||
+        lastAIResponse.toLowerCase().includes('which') ||
+        lastAIResponse.toLowerCase().includes('name')) {
+      // We asked a question, give them more time to answer
       const gather = twiml.gather({
         input: 'speech',
-        timeout: 15,
+        timeout: 10,
         action: '/voice/process-ai',
         method: 'POST',
-        speechTimeout: 3
+        speechTimeout: 2
       });
 
       gather.say({
         voice: 'Polly.Joanna'
-      }, 'Please take your time. What is your name?');
+      }, 'I\'m still listening. Please tell me what you need.');
+
+      // Add fallback redirect
+      twiml.redirect('/voice/process-ai');
     } else {
+      // No question was asked, might be end of conversation
       twiml.say({
         voice: 'Polly.Joanna'
-      }, 'I didn\'t hear anything. Please tell me what type of appointment you need.');
-      twiml.redirect('/voice/incoming');
+      }, 'If you need anything else, please let me know. Otherwise, have a great day!');
+
+      // Give them a chance to continue
+      const gather = twiml.gather({
+        input: 'speech',
+        timeout: 5,
+        action: '/voice/process-ai',
+        method: 'POST'
+      });
     }
     res.type('text/xml');
     res.send(twiml.toString());
