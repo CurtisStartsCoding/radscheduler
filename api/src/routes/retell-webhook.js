@@ -23,7 +23,7 @@ async function setupRetellAgent() {
   try {
     const agentConfig = {
       agent_name: 'RadScheduler Assistant',
-      voice_id: '11labs-rachel', // Professional female voice
+      voice_id: '11labs-rachel', // Superior quality 11labs professional female voice
       voice_speed: 1.0,
       voice_temperature: 0.3, // Lower temperature for more consistent voice
       responsiveness: 0.8, // High responsiveness for natural conversation
