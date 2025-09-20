@@ -57,7 +57,7 @@ jobs:
     - name: Deploy to EC2
       run: |
         echo "Deploying to EC2..."
-        ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 ${{ env.EC2_USER }}@${{ env.EC2_HOST }} << 'ENDSSH'
+        ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 ubuntu@50.19.63.140 << 'ENDSSH'
           set -e
 
           # Navigate to app directory
