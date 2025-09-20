@@ -21,6 +21,8 @@ const clinicalRoutes = require('./routes/clinical-integration');
 const authRoutes = require('./routes/auth');
 const avreoRoutes = require('./routes/avreo-integration');
 const patientSchedulingRoutes = require('./routes/patient-scheduling');
+const voiceIntegrationRoutes = require('./routes/voice-integration'); // Voice AI System Integration
+const organizationRoutes = require('./routes/organizations'); // Multi-tenant organizations
 
 const app = express();
 const httpServer = createServer(app);
@@ -70,14 +72,23 @@ app.get('/health', (req, res) => {
 });
 
 // Required environment variable check
-const requiredEnv = [
-  'DATABASE_URL', 'REDIS_URL', 'TWILIO_ACCOUNT_SID', 'TWILIO_AUTH_TOKEN',
+const requiredEnv = ['DATABASE_URL'];
+const optionalEnv = [
+  'REDIS_URL', 'TWILIO_ACCOUNT_SID', 'TWILIO_AUTH_TOKEN',
   'TWILIO_PHONE_NUMBER', 'ANTHROPIC_API_KEY'
 ];
+
 requiredEnv.forEach((key) => {
   if (!process.env[key]) {
     console.error(`Missing required env var: ${key}`);
     process.exit(1);
+  }
+});
+
+// Log optional vars that are missing (but don't exit)
+optionalEnv.forEach((key) => {
+  if (!process.env[key]) {
+    logger.warn(`Optional env var not set: ${key} - some features may be disabled`);
   }
 });
 
@@ -89,6 +100,8 @@ app.use('/api/analytics', analyticsRoutes);
 app.use('/api/clinical', clinicalRoutes);
 app.use('/api/avreo', avreoRoutes);
 app.use('/api/patient', patientSchedulingRoutes);
+app.use('/api/voice', voiceIntegrationRoutes); // Voice AI System endpoints (separate system)
+app.use('/api/organizations', organizationRoutes); // Multi-tenant organization management
 
 // Only mount demo endpoints in non-production
 if (process.env.NODE_ENV !== 'production') {
@@ -144,3 +157,4 @@ async function shutdown() {
 
 // Start the server
 startServer();
+

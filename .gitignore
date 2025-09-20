@@ -79,4 +79,9 @@ web/.next/
 
 # API keys and secrets
 api/.env
-web/.env.local 
+web/.env.local
+
+# AWS Credentials - NEVER commit these!
+.aws/credentials
+.aws/credentials*
+*.pem
