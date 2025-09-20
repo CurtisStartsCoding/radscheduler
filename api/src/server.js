@@ -23,7 +23,7 @@ const avreoRoutes = require('./routes/avreo-integration');
 const patientSchedulingRoutes = require('./routes/patient-scheduling');
 const voiceIntegrationRoutes = require('./routes/voice-integration'); // Voice AI System Integration
 const organizationRoutes = require('./routes/organizations'); // Multi-tenant organizations
-const twilioVoiceRoutes = require('./routes/twilio-voice-enhanced'); // Enhanced Twilio voice handler
+const twilioVoiceRoutes = require('./routes/twilio-voice-ai'); // AI-powered Twilio voice handler
 
 const app = express();
 const httpServer = createServer(app);

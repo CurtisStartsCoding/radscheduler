@@ -1,0 +1,200 @@
+const express = require('express');
+const router = express.Router();
+const VoiceResponse = require('twilio').twiml.VoiceResponse;
+const twilio = require('twilio');
+const Anthropic = require('@anthropic-ai/sdk');
+const logger = require('../utils/logger');
+
+// Initialize clients
+const twilioClient = twilio(
+  process.env.TWILIO_ACCOUNT_SID,
+  process.env.TWILIO_AUTH_TOKEN
+);
+
+const anthropic = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY,
+});
+
+// Store conversation context
+const conversations = {};
+
+// System prompt for Claude
+const SYSTEM_PROMPT = `You are a helpful medical scheduling assistant for RadScheduler, a radiology department booking system.
+
+Your role:
+- Schedule radiology appointments (MRI, CT scan, X-ray, ultrasound, PET scan, mammogram, etc.)
+- Be conversational but concise - responses will be spoken aloud
+- Gather necessary information: type of scan, urgency, preferred time
+- Provide available appointment slots
+- Confirm bookings
+
+Current available slots (use these as examples):
+- Today 3:30 PM (urgent cases)
+- Tomorrow 9:00 AM, 2:00 PM
+- Thursday 10:30 AM, 3:00 PM
+- Friday 8:00 AM, 1:00 PM
+
+Keep responses under 2 sentences when possible. Be warm and professional.
+If asked about non-scheduling topics, politely redirect to scheduling.`;
+
+// Get AI response from Claude
+async function getAIResponse(userInput, conversationHistory = []) {
+  try {
+    const messages = [
+      ...conversationHistory,
+      { role: 'user', content: userInput }
+    ];
+
+    const response = await anthropic.messages.create({
+      model: 'claude-3-haiku-20240307', // Fast, cost-effective for voice
+      system: SYSTEM_PROMPT,
+      messages: messages,
+      max_tokens: 150, // Keep responses concise for voice
+      temperature: 0.7,
+    });
+
+    return response.content[0].text;
+  } catch (error) {
+    logger.error('Claude API error:', error);
+    return "I'm having trouble understanding. Could you please repeat what type of scan you need?";
+  }
+}
+
+// Handle incoming calls
+router.post('/incoming', (req, res) => {
+  const twiml = new VoiceResponse();
+  const callSid = req.body.CallSid;
+  const fromNumber = req.body.From;
+
+  // Initialize conversation
+  conversations[callSid] = {
+    phoneNumber: fromNumber,
+    history: [],
+    startTime: new Date()
+  };
+
+  const gather = twiml.gather({
+    input: 'speech',
+    timeout: 3,
+    language: 'en-US',
+    action: '/voice/process-ai',
+    method: 'POST',
+    speechTimeout: 'auto',
+    enhanced: true,
+    speechModel: 'phone_call'
+  });
+
+  gather.say({
+    voice: 'Polly.Joanna',
+    language: 'en-US'
+  }, 'Welcome to RadScheduler. How can I help you with your radiology appointment today?');
+
+  twiml.redirect('/voice/incoming');
+
+  res.type('text/xml');
+  res.send(twiml.toString());
+});
+
+// Process speech with AI
+router.post('/process-ai', async (req, res) => {
+  const twiml = new VoiceResponse();
+  const speechResult = req.body.SpeechResult || '';
+  const callSid = req.body.CallSid;
+
+  logger.info('Speech input:', { callSid, speech: speechResult });
+
+  if (!speechResult) {
+    twiml.say({
+      voice: 'Polly.Joanna'
+    }, 'I didn\'t hear anything. Please tell me what type of appointment you need.');
+    twiml.redirect('/voice/incoming');
+    res.type('text/xml');
+    res.send(twiml.toString());
+    return;
+  }
+
+  // Get conversation context
+  const conversation = conversations[callSid] || { history: [] };
+
+  // Get AI response
+  const aiResponse = await getAIResponse(speechResult, conversation.history);
+
+  // Update conversation history
+  conversation.history.push(
+    { role: 'user', content: speechResult },
+    { role: 'assistant', content: aiResponse }
+  );
+  conversations[callSid] = conversation;
+
+  // Check if booking is confirmed in the response
+  const isBookingConfirmed = aiResponse.toLowerCase().includes('confirmed') ||
+                             aiResponse.toLowerCase().includes('scheduled') ||
+                             aiResponse.toLowerCase().includes('booked');
+
+  if (isBookingConfirmed) {
+    // Send SMS confirmation if booking is confirmed
+    const fromNumber = req.body.From;
+    await sendSMSConfirmation(fromNumber, aiResponse);
+
+    // Say the response and end call
+    twiml.say({
+      voice: 'Polly.Joanna'
+    }, aiResponse + ' Thank you for using RadScheduler. Goodbye!');
+
+    // Clean up conversation
+    delete conversations[callSid];
+
+  } else {
+    // Continue conversation
+    const gather = twiml.gather({
+      input: 'speech',
+      timeout: 3,
+      action: '/voice/process-ai',
+      method: 'POST',
+      speechTimeout: 'auto',
+      enhanced: true,
+      speechModel: 'phone_call'
+    });
+
+    gather.say({
+      voice: 'Polly.Joanna'
+    }, aiResponse);
+
+    // If no input, process again
+    twiml.redirect('/voice/process-ai');
+  }
+
+  res.type('text/xml');
+  res.send(twiml.toString());
+});
+
+// Send SMS confirmation
+async function sendSMSConfirmation(phoneNumber, bookingDetails) {
+  try {
+    const message = await twilioClient.messages.create({
+      body: `RadScheduler Confirmation:\n\n${bookingDetails}\n\nTo cancel or reschedule, call (239) 382-5683`,
+      from: process.env.TWILIO_PHONE_NUMBER,
+      to: phoneNumber
+    });
+    logger.info('SMS sent', { messageId: message.sid });
+    return true;
+  } catch (error) {
+    logger.error('SMS error:', error);
+    return false;
+  }
+}
+
+// Handle call status updates
+router.post('/status', (req, res) => {
+  const callSid = req.body.CallSid;
+  logger.info('Call status:', req.body);
+
+  // Clean up on call end
+  if (req.body.CallStatus === 'completed') {
+    delete conversations[callSid];
+  }
+
+  res.sendStatus(200);
+});
+
+module.exports = router;
