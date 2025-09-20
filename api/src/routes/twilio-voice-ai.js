@@ -94,11 +94,11 @@ router.post('/incoming', (req, res) => {
 
   const gather = twiml.gather({
     input: 'speech',
-    timeout: 3,
+    timeout: 10,  // Increased from 3 to 10 seconds for longer responses
     language: 'en-US',
     action: '/voice/process-ai',
     method: 'POST',
-    speechTimeout: 'auto',
+    speechTimeout: 2,  // Wait 2 seconds of silence before processing
     enhanced: true,
     speechModel: 'phone_call'
   });
@@ -123,10 +123,30 @@ router.post('/process-ai', async (req, res) => {
   logger.info('Speech input:', { callSid, speech: speechResult });
 
   if (!speechResult) {
-    twiml.say({
-      voice: 'Polly.Joanna'
-    }, 'I didn\'t hear anything. Please tell me what type of appointment you need.');
-    twiml.redirect('/voice/incoming');
+    // Check if we're waiting for important info like name
+    const conversation = conversations[callSid];
+    const lastResponse = conversation?.history?.slice(-1)[0]?.content || '';
+
+    if (lastResponse.toLowerCase().includes('name') ||
+        lastResponse.toLowerCase().includes('spell')) {
+      // Give them more time for names
+      const gather = twiml.gather({
+        input: 'speech',
+        timeout: 15,
+        action: '/voice/process-ai',
+        method: 'POST',
+        speechTimeout: 3
+      });
+
+      gather.say({
+        voice: 'Polly.Joanna'
+      }, 'Please take your time. What is your name?');
+    } else {
+      twiml.say({
+        voice: 'Polly.Joanna'
+      }, 'I didn\'t hear anything. Please tell me what type of appointment you need.');
+      twiml.redirect('/voice/incoming');
+    }
     res.type('text/xml');
     res.send(twiml.toString());
     return;
@@ -189,10 +209,10 @@ router.post('/process-ai', async (req, res) => {
     // Continue conversation
     const gather = twiml.gather({
       input: 'speech',
-      timeout: 3,
+      timeout: 10,  // Increased for longer responses like names
       action: '/voice/process-ai',
       method: 'POST',
-      speechTimeout: 'auto',
+      speechTimeout: 2,  // Wait for pause in speech
       enhanced: true,
       speechModel: 'phone_call'
     });
