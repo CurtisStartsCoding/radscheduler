@@ -7,30 +7,57 @@ on:
       - 'api/**'
       - 'package*.json'
       - '.github/workflows/deploy.yml'
+  workflow_dispatch:
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+      AWS_REGION: us-east-1
+      EC2_HOST: ${{ secrets.EC2_HOST }}
+      EC2_USER: ${{ secrets.EC2_USER }}
+      SECURITY_GROUP_ID: sg-0a04fb0571125faf2
 
     steps:
     - uses: actions/checkout@v3
 
-    - name: Deploy to EC2
-      env:
-        HOST: ${{ secrets.EC2_HOST }}
-        USER: ${{ secrets.EC2_USER }}
-        KEY: ${{ secrets.EC2_SSH_KEY }}
+    - name: Configure AWS credentials (optional - for security group management)
+      if: ${{ secrets.AWS_ACCESS_KEY_ID != '' }}
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Get runner IP address
+      if: ${{ secrets.AWS_ACCESS_KEY_ID != '' }}
+      id: ip
+      uses: haythem/public-ip@v1.3
+
+    - name: Whitelist runner IP address
+      if: ${{ secrets.AWS_ACCESS_KEY_ID != '' }}
       run: |
-        # Create SSH key file
-        echo "$KEY" > deploy_key
-        chmod 600 deploy_key
+        aws ec2 authorize-security-group-ingress \
+          --group-id ${{ env.SECURITY_GROUP_ID }} \
+          --protocol tcp \
+          --port 22 \
+          --cidr ${{ steps.ip.outputs.ipv4 }}/32 \
+          --output text || true
 
-        # Add host to known hosts
+    - name: Setup SSH Agent
+      uses: webfactory/ssh-agent@v0.9.0
+      with:
+        ssh-private-key: ${{ secrets.EC2_SSH_KEY }}
+
+    - name: Add known hosts
+      run: |
         mkdir -p ~/.ssh
-        ssh-keyscan -H $HOST >> ~/.ssh/known_hosts
+        ssh-keyscan -H ${{ env.EC2_HOST }} >> ~/.ssh/known_hosts
 
-        # Deploy to EC2
-        ssh -i deploy_key $USER@$HOST << 'ENDSSH'
+    - name: Deploy to EC2
+      run: |
+        echo "Deploying to EC2..."
+        ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 ${{ env.EC2_USER }}@${{ env.EC2_HOST }} << 'ENDSSH'
           set -e
 
           # Navigate to app directory
@@ -64,5 +91,12 @@ jobs:
           echo "Deployment complete!"
         ENDSSH
 
-        # Clean up
-        rm -f deploy_key
+    - name: Revoke runner IP address
+      if: always() && secrets.AWS_ACCESS_KEY_ID != ''
+      run: |
+        aws ec2 revoke-security-group-ingress \
+          --group-id ${{ env.SECURITY_GROUP_ID }} \
+          --protocol tcp \
+          --port 22 \
+          --cidr ${{ steps.ip.outputs.ipv4 }}/32 \
+          --output text || true

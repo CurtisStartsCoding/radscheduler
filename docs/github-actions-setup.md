@@ -23,8 +23,23 @@ You need to add these secrets to your GitHub repository:
 
 ### 3. EC2_SSH_KEY
 - **Value:** Contents of `radscheduler-key.pem`
-- Copy the entire contents of your SSH private key file
-- Include the BEGIN and END lines
+- Copy the ENTIRE contents of your SSH private key file
+- **IMPORTANT:** Include the BEGIN and END lines exactly as they appear:
+  ```
+  -----BEGIN RSA PRIVATE KEY-----
+  [your key content here]
+  -----END RSA PRIVATE KEY-----
+  ```
+- Make sure there are no extra spaces or line breaks before/after
+
+### 4. AWS_ACCESS_KEY_ID (Optional but recommended)
+- **Value:** Your AWS Access Key ID
+- Used for dynamic security group management
+- Allows GitHub Actions to temporarily whitelist its IP
+
+### 5. AWS_SECRET_ACCESS_KEY (Optional but recommended)
+- **Value:** Your AWS Secret Access Key
+- Used with AWS_ACCESS_KEY_ID for security group management
 
 ## How It Works
 
