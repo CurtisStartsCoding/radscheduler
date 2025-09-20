@@ -18,8 +18,21 @@ const anthropic = new Anthropic({
 // Store conversation context
 const conversations = {};
 
-// System prompt for Claude
-const SYSTEM_PROMPT = `You are a helpful medical scheduling assistant for RadScheduler, a radiology department booking system.
+// Get AI response from Claude
+async function getAIResponse(userInput, conversationHistory = []) {
+  try {
+    // Generate fresh timestamp for each call
+    const currentTime = new Date().toLocaleString('en-US', {
+      timeZone: 'America/New_York',
+      weekday: 'long',
+      month: 'long',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: 'numeric',
+      hour12: true
+    });
+
+    const systemPrompt = `You are a helpful medical scheduling assistant for RadScheduler, a radiology department booking system.
 
 Your role:
 - Schedule radiology appointments (MRI, CT scan, X-ray, ultrasound, PET scan, mammogram, etc.)
@@ -28,7 +41,7 @@ Your role:
 - Provide available appointment slots
 - Confirm bookings
 
-Current time: ${new Date().toLocaleString('en-US', { timeZone: 'America/New_York', weekday: 'long', month: 'long', day: 'numeric', hour: 'numeric', minute: 'numeric', hour12: true })}
+Current time: ${currentTime}
 
 Available appointment slots:
 - Tomorrow morning: 9:00 AM, 11:00 AM
@@ -39,11 +52,13 @@ Available appointment slots:
 For urgent/emergency cases, mention the next available slot tomorrow morning.
 
 Keep responses under 2 sentences when possible. Be warm and professional.
-Never say "goodbye" unless the appointment is confirmed or the caller explicitly wants to end the call.`;
+Only end the call if:
+1. An appointment is successfully booked and confirmed
+2. The caller explicitly says goodbye, hangs up, or wants to end the call
+3. The caller declines to book an appointment after being asked
 
-// Get AI response from Claude
-async function getAIResponse(userInput, conversationHistory = []) {
-  try {
+Do NOT end the call just because you mentioned scheduling or booking in your response.`;
+
     const messages = [
       ...conversationHistory,
       { role: 'user', content: userInput }
@@ -51,7 +66,7 @@ async function getAIResponse(userInput, conversationHistory = []) {
 
     const response = await anthropic.messages.create({
       model: 'claude-3-haiku-20240307', // Fast, cost-effective for voice
-      system: SYSTEM_PROMPT,
+      system: systemPrompt,
       messages: messages,
       max_tokens: 150, // Keep responses concise for voice
       temperature: 0.7,
@@ -130,10 +145,25 @@ router.post('/process-ai', async (req, res) => {
   );
   conversations[callSid] = conversation;
 
-  // Check if booking is confirmed in the response
-  const isBookingConfirmed = aiResponse.toLowerCase().includes('confirmed') ||
-                             aiResponse.toLowerCase().includes('scheduled') ||
-                             aiResponse.toLowerCase().includes('booked');
+  // Check if booking is EXPLICITLY confirmed (not just mentioned)
+  const confirmPhrases = [
+    'appointment has been scheduled',
+    'appointment is confirmed',
+    'booked your appointment',
+    'successfully scheduled',
+    'all set for',
+    'see you on'
+  ];
+
+  const isBookingConfirmed = confirmPhrases.some(phrase =>
+    aiResponse.toLowerCase().includes(phrase)
+  );
+
+  // Also check if caller is ending the call
+  const isEndingCall = speechResult.toLowerCase().includes('goodbye') ||
+                       speechResult.toLowerCase().includes('bye') ||
+                       speechResult.toLowerCase().includes('thank you') &&
+                       speechResult.toLowerCase().includes('done');
 
   if (isBookingConfirmed) {
     // Send SMS confirmation if booking is confirmed
@@ -171,7 +201,8 @@ router.post('/process-ai', async (req, res) => {
       voice: 'Polly.Joanna'
     }, aiResponse);
 
-    // Don't redirect - let the gather timeout handle it
+    // Redirect back to continue conversation if no input
+    twiml.redirect('/voice/process-ai');
   }
 
   res.type('text/xml');
