@@ -1,0 +1,68 @@
+name: Deploy to EC2
+
+on:
+  push:
+    branches: [ master, main ]
+    paths:
+      - 'api/**'
+      - 'package*.json'
+      - '.github/workflows/deploy.yml'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Deploy to EC2
+      env:
+        HOST: ${{ secrets.EC2_HOST }}
+        USER: ${{ secrets.EC2_USER }}
+        KEY: ${{ secrets.EC2_SSH_KEY }}
+      run: |
+        # Create SSH key file
+        echo "$KEY" > deploy_key
+        chmod 600 deploy_key
+
+        # Add host to known hosts
+        mkdir -p ~/.ssh
+        ssh-keyscan -H $HOST >> ~/.ssh/known_hosts
+
+        # Deploy to EC2
+        ssh -i deploy_key $USER@$HOST << 'ENDSSH'
+          set -e
+
+          # Navigate to app directory
+          cd /home/ubuntu/radscheduler
+
+          # Pull latest code
+          echo "Pulling latest code..."
+          git pull origin master || git pull origin main
+
+          # Install/update dependencies
+          echo "Installing API dependencies..."
+          cd api
+          npm ci --production
+
+          # Run database migrations
+          echo "Running database migrations..."
+          if [ -d "scripts" ]; then
+            for sql_file in scripts/*.sql; do
+              if [ -f "$sql_file" ]; then
+                echo "Running $sql_file..."
+                psql $DATABASE_URL -f $sql_file || true
+              fi
+            done
+          fi
+
+          # Restart application with PM2
+          echo "Restarting application..."
+          pm2 restart radscheduler-api || pm2 start src/server.js --name radscheduler-api
+          pm2 save
+
+          echo "Deployment complete!"
+        ENDSSH
+
+        # Clean up
+        rm -f deploy_key
