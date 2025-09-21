@@ -57,12 +57,18 @@ jobs:
         ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 ubuntu@50.19.63.140 << 'ENDSSH'
           set -e
 
-          # Navigate to app directory
-          cd /home/ubuntu/radscheduler
-
-          # Pull latest code
-          echo "Pulling latest code..."
-          git pull origin master || git pull origin main
+          # Clone or navigate to app directory
+          if [ ! -d "/home/ubuntu/radscheduler" ]; then
+            echo "Cloning repository..."
+            cd /home/ubuntu
+            git clone https://github.com/CurtisStartsCoding/radscheduler.git
+            cd radscheduler
+          else
+            cd /home/ubuntu/radscheduler
+            # Pull latest code
+            echo "Pulling latest code..."
+            git pull origin master || git pull origin main
+          fi
 
           # Install/update dependencies
           echo "Installing API dependencies..."
