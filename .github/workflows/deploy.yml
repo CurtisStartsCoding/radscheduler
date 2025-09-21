@@ -58,6 +58,9 @@ jobs:
     - name: Deploy to EC2
       run: |
         echo "Deploying to EC2..."
+        echo "Testing SSH connection..."
+        ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 -v ubuntu@3.21.14.188 "echo 'Connected successfully'"
+        echo "Running deployment..."
         ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 ubuntu@3.21.14.188 << 'ENDSSH'
           set -e
 
