@@ -49,7 +49,7 @@ jobs:
     - name: Add known hosts
       run: |
         mkdir -p ~/.ssh
-        ssh-keyscan -H ${{ env.EC2_HOST }} >> ~/.ssh/known_hosts
+        ssh-keyscan -H 50.19.63.140 >> ~/.ssh/known_hosts
 
     - name: Deploy to EC2
       run: |
