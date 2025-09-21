@@ -4,7 +4,8 @@
       "Bash(mkdir:*)",
       "Bash(node:*)",
       "WebFetch(domain:github.com)",
-      "WebSearch"
+      "WebSearch",
+      "Read(//c/Apps/radorderpad-api/final-documentation/**)"
     ],
     "deny": []
   }
