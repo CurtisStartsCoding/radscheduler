@@ -23,6 +23,7 @@ jobs:
 
     - name: Configure AWS credentials (optional - for security group management)
       uses: aws-actions/configure-aws-credentials@v4
+      continue-on-error: true
       with:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -30,9 +31,11 @@ jobs:
 
     - name: Get runner IP address
       id: ip
+      continue-on-error: true
       uses: haythem/public-ip@v1.3
 
     - name: Whitelist runner IP address
+      continue-on-error: true
       run: |
         aws ec2 authorize-security-group-ingress \
           --group-id ${{ env.SECURITY_GROUP_ID }} \
@@ -96,6 +99,7 @@ jobs:
 
     - name: Revoke runner IP address
       if: always()
+      continue-on-error: true
       run: |
         aws ec2 revoke-security-group-ingress \
           --group-id ${{ env.SECURITY_GROUP_ID }} \
