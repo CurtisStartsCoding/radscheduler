@@ -46,6 +46,7 @@ jobs:
 
     - name: Setup SSH Agent
       uses: webfactory/ssh-agent@v0.9.0
+      continue-on-error: true
       with:
         ssh-private-key: ${{ secrets.EC2_SSH_KEY }}
 
