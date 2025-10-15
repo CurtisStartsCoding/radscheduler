@@ -1,34 +1,23 @@
 {
   "name": "radscheduler",
-  "version": "1.0.0",
-  "description": "Hackathon-winning RIS scheduling integration",
+  "version": "5.2.0",
+  "description": "HIPAA-compliant SMS self-scheduling for radiology imaging",
   "scripts": {
-    "setup": "npm run setup:api && npm run setup:web",
-    "setup:api": "cd api && npm install",
-    "setup:web": "cd web && npm install",
-    "dev": "concurrently \"npm run dev:api\" \"npm run dev:web\"",
-    "dev:api": "cd api && npm run dev",
-    "dev:web": "cd web && npm run dev",
-    "docker:up": "docker-compose up -d",
-    "docker:down": "docker-compose down",
-    "docker:logs": "docker-compose logs -f",
-    "seed-demo": "cd api && npm run seed:demo",
-    "demo:dramatic-save": "cd simulator && python trigger-scenario.py dramatic-save",
-    "demo:efficiency-boost": "cd simulator && python trigger-scenario.py efficiency-boost",
-    "reset-demo": "cd api && npm run db:reset && npm run seed:demo",
-    "load-test": "cd api && npm run test:load"
+    "setup": "cd api && npm install",
+    "dev": "cd api && npm run dev",
+    "deploy": "bash deploy.sh",
+    "migrate": "node migrate.js"
   },
   "keywords": [
     "healthcare",
-    "hl7",
+    "sms",
     "scheduling",
-    "radiology"
+    "radiology",
+    "hipaa",
+    "twilio"
   ],
-  "author": "RadScheduler Team",
+  "author": "RadScheduler",
   "license": "MIT",
-  "devDependencies": {
-    "concurrently": "^8.2.0"
-  },
   "dependencies": {
     "axios": "^1.10.0"
   }
