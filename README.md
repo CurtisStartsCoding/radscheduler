@@ -1,8 +1,9 @@
 # RadScheduler - HIPAA-Compliant SMS Self-Scheduling
 
 **Version:** Phase 5.2
-**Status:** 🔵 In Development - Hardening for Production
+**Status:** 🟢 Production-Ready Infrastructure | ⚠️ Awaiting RIS Integration
 **Purpose:** Patient self-scheduling via SMS for radiology imaging appointments
+**Last Updated:** October 15, 2025
 
 ---
 
@@ -62,10 +63,13 @@ RadScheduler enables patients to self-schedule their radiology imaging appointme
 - ✅ **PHI minimization:** No patient names or diagnoses in SMS
 - ✅ **Twilio BAA:** Business Associate Agreement required
 
-### Security
+### Security & Performance
 - ✅ Twilio webhook signature verification
+- ✅ Bearer token authentication for order webhooks
 - ✅ Input sanitization and validation
-- ✅ Rate limiting (per-phone-number)
+- ✅ Smart rate limiting (2000/hour for APIs, unlimited for webhooks)
+- ✅ Trust proxy configured for nginx reverse proxy
+- ✅ Order deduplication (prevents SMS spam)
 - ✅ PostgreSQL-only (no Redis dependency)
 - ✅ Secure environment variable management
 
@@ -92,10 +96,11 @@ TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxx
 TWILIO_AUTH_TOKEN=xxxxxxxxxxxxxxxxx
 TWILIO_PHONE_NUMBER=+1234567890
 
-# QIE Integration (REQUIRED)
+# QIE Integration (REQUIRED for production)
 QIE_API_URL=http://10.0.1.211:8082/api/ris
 QIE_API_KEY=your_api_key
 QIE_TIMEOUT_MS=5000
+USE_MOCK_RIS=true  # Use mock data for testing (set to false when RIS is ready)
 
 # SMS Configuration
 SMS_CONSENT_REQUIRED=true
@@ -131,11 +136,51 @@ curl http://localhost:3010/health
 
 ---
 
+## 🌐 Current Deployment Status
+
+### Production Infrastructure (✅ Complete)
+- **Domain:** `scheduler.radorderpad.com`
+- **SSL:** Let's Encrypt (auto-renewing, expires Jan 13, 2026)
+- **Reverse Proxy:** Nginx on EC2 (3.21.14.188)
+- **Database:** PostgreSQL `radorder_main` (RDS)
+- **SMS:** Twilio webhook configured and active
+- **Process Manager:** PM2 with auto-restart
+
+### What's Working
+- ✅ HTTPS endpoints publicly accessible
+- ✅ Twilio webhook receiving inbound SMS
+- ✅ Order webhook processing
+- ✅ SMS consent flow
+- ✅ Patient consent recording
+- ✅ Rate limiting (6000+ webhooks/hour capacity)
+- ✅ Order deduplication (prevents duplicate SMS)
+- ✅ Mock RIS client (for testing without QIE)
+
+### What's Pending
+- ⏳ QIE/RIS integration (locations, slots, booking)
+- ⏳ Production Twilio A2P 10DLC registration
+- ⏳ End-to-end flow testing with real calendar data
+
+### Testing Mode
+Currently using **mock RIS client** that returns synthetic data:
+- **Locations:** 3 Fort Myers imaging centers
+- **Slots:** Next 3 days with 30-minute windows
+- **Bookings:** Generated confirmation numbers
+
+To switch to real RIS, set `USE_MOCK_RIS=false` in environment variables.
+
+---
+
 ## 📡 API Endpoints
 
-### Core Endpoints
-- `GET /health` - System health check
-- `POST /api/sms/webhook` - Twilio inbound SMS webhook (Twilio signature verified)
+### Public Endpoints (HTTPS)
+- `GET https://scheduler.radorderpad.com/health` - System health check
+- `POST https://scheduler.radorderpad.com/api/sms/webhook` - Twilio inbound SMS (Twilio signature verified)
+- `POST https://scheduler.radorderpad.com/api/orders/webhook` - Order creation from RIS (Bearer token required)
+
+### Local Development
+- `GET http://localhost:3010/health` - System health check
+- `POST http://localhost:3010/api/sms/webhook` - Twilio inbound SMS webhook
 
 ### Admin Endpoints (if auth enabled)
 - `GET /api/auth/login` - Authentication
@@ -280,9 +325,19 @@ QIE_API_URL=http://qie.internal:8082/api/ris
 
 ## 📚 Documentation
 
+### Implementation & Testing
+- **[Phase 4 Testing Progress](PHASE-4-TESTING-PROGRESS.md)** - Complete testing report with all features verified
+- **[Reverse Proxy Test Results](REVERSE-PROXY-TEST-RESULTS.md)** - Infrastructure testing and verification
+- **[Deployment Guide](DEPLOYMENT.md)** - Production deployment instructions
+
+### Planning & Architecture
 - **[Hardening Plan](radscheduler-hardening-plan.md)** - Complete security and architecture hardening plan
 - **[Legacy Docs Cleanup](LEGACY-DOCS-TO-DELETE-OR-UPDATE.md)** - Documentation cleanup guide
 - **[Phase 5.2 Spec](../radorderpad-api/final-documentation/qvera/phase-5.2-radscheduler-sms-epic.md)** - Full implementation specification
+
+### Additional Resources
+- **[AWS Deployment Guide](docs/aws-deployment-guide.md)** - EC2 and RDS setup
+- **[Production Checklist](docs/production-checklist.md)** - Pre-launch verification
 
 ### Legacy Documentation
 Legacy documentation for the old HL7/AI/RIS integration architecture has been removed. If needed for reference, it's preserved in git history at commit `backup-voice-ai-sept21`.

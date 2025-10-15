@@ -469,9 +469,74 @@ async function updateConversationState(conversationId, newState) {
   );
 }
 
+/**
+ * Add order to existing conversation's pending queue
+ * Prevents duplicate SMS when multiple orders arrive for same patient
+ */
+async function addOrderToConversation(conversationId, newOrderData) {
+  const pool = getPool();
+
+  try {
+    // Get current conversation
+    const result = await pool.query(
+      'SELECT order_data FROM sms_conversations WHERE id = $1',
+      [conversationId]
+    );
+
+    if (result.rows.length === 0) {
+      throw new Error('Conversation not found');
+    }
+
+    const currentData = typeof result.rows[0].order_data === 'string'
+      ? JSON.parse(result.rows[0].order_data)
+      : result.rows[0].order_data;
+
+    // Initialize pending orders array if it doesn't exist
+    if (!currentData.pendingOrders) {
+      currentData.pendingOrders = [];
+    }
+
+    // Add new order to pending queue
+    currentData.pendingOrders.push(newOrderData);
+
+    // Update conversation
+    await pool.query(
+      `UPDATE sms_conversations
+       SET order_data = $1, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $2`,
+      [JSON.stringify(currentData), conversationId]
+    );
+
+    logger.info('Order added to existing conversation', {
+      conversationId,
+      newOrderId: newOrderData.orderId,
+      pendingCount: currentData.pendingOrders.length
+    });
+
+    return true;
+  } catch (error) {
+    logger.error('Failed to add order to conversation', {
+      error: error.message,
+      conversationId,
+      newOrderId: newOrderData.orderId
+    });
+    throw error;
+  }
+}
+
+/**
+ * Get active conversation by phone number (wrapper for hash)
+ */
+async function getActiveConversationByPhone(phoneNumber) {
+  const phoneHash = hashPhoneNumber(phoneNumber);
+  return await getActiveConversation(phoneHash);
+}
+
 module.exports = {
   startConversation,
   handleInboundMessage,
   getActiveConversation,
+  getActiveConversationByPhone,
+  addOrderToConversation,
   STATES
 };

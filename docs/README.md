@@ -8,8 +8,15 @@
 
 ## 📚 Documentation Index
 
+### Implementation & Testing (October 2025)
+- **[Phase 4 Testing Progress](../PHASE-4-TESTING-PROGRESS.md)** - Complete testing report and results
+- **[Reverse Proxy Test Results](../REVERSE-PROXY-TEST-RESULTS.md)** - Infrastructure testing
+- **[Deployment Guide](../DEPLOYMENT.md)** - Production deployment instructions
+
 ### Core Documentation
 - **[Hardening Plan](../radscheduler-hardening-plan.md)** - Security and architecture hardening for Phase 5.2
+- **[Production Checklist](production-checklist.md)** - Pre-launch verification
+- **[AWS Deployment Guide](aws-deployment-guide.md)** - EC2 and RDS setup
 - **[Legacy Docs Cleanup](../LEGACY-DOCS-TO-DELETE-OR-UPDATE.md)** - Documentation cleanup guide
 
 ### External Documentation
@@ -150,12 +157,15 @@ radscheduler/
 
 ## 🚀 Development Workflow
 
-### Files to Implement (Phase 5.2)
-1. **`api/src/routes/sms-webhook.js`** - Twilio inbound SMS handler
-2. **`api/src/services/sms-conversation.js`** - Conversation state management
-3. **`api/src/services/patient-consent.js`** - Consent tracking
-4. **`api/src/services/sms-audit.js`** - HIPAA audit logging
-5. **`api/src/services/ris-api-client.js`** - QIE REST API client
+### Files Implemented (Phase 5.2) ✅ COMPLETE
+1. ✅ **`api/src/routes/sms-webhook.js`** - Twilio inbound SMS handler
+2. ✅ **`api/src/routes/order-webhook.js`** - Order creation webhook
+3. ✅ **`api/src/services/sms-conversation.js`** - Conversation state management
+4. ✅ **`api/src/services/patient-consent.js`** - Consent tracking
+5. ✅ **`api/src/services/sms-audit.js`** - HIPAA audit logging
+6. ✅ **`api/src/services/ris-api-client.js`** - QIE REST API client (with mock mode)
+7. ✅ **`api/src/services/session-cleanup.js`** - Auto-expiry cleanup job
+8. ✅ **`api/src/server.js`** - Express server with rate limiting and trust proxy
 
 ### Files to Keep (Existing)
 - `api/src/services/notifications.js` - Twilio SMS (already exists!)

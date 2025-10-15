@@ -20,6 +20,10 @@ const orderWebhookRoutes = require('./routes/order-webhook');
 const app = express();
 const httpServer = createServer(app);
 
+// Trust proxy - required when behind nginx reverse proxy
+// This allows rate limiter to see real client IPs from X-Forwarded-For header
+app.set('trust proxy', 1);
+
 // Middleware
 app.use(helmet());
 app.use(compression());
@@ -34,14 +38,20 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
 // Rate limiting - configured for 2000 requests/hour capacity
+// Webhooks are exempt (have their own auth: Bearer token + Twilio signature)
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: process.env.NODE_ENV === 'production' ? 500 : 1000, // 500 req/15min = 2000/hour
   message: 'Too many requests, please try again later.',
   standardHeaders: true,
   legacyHeaders: false,
-  // Skip rate limiting for health checks
-  skip: (req) => req.path === '/health'
+  skip: (req) => {
+    // Exempt health checks and webhook endpoints
+    // Webhooks have their own security (Bearer token, Twilio signature)
+    return req.path === '/health' ||
+           req.path === '/api/sms/webhook' ||
+           req.path === '/api/orders/webhook';
+  }
 });
 app.use('/api/', limiter);
 

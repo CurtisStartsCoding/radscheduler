@@ -11,6 +11,7 @@ const QIE_API_URL = process.env.QIE_API_URL || 'http://10.0.1.211:8082/api/ris';
 const QIE_API_KEY = process.env.QIE_API_KEY;
 const QIE_TIMEOUT_MS = parseInt(process.env.QIE_TIMEOUT_MS) || 5000;
 const MAX_RETRY_ATTEMPTS = parseInt(process.env.SMS_MAX_RETRY_ATTEMPTS) || 3;
+const USE_MOCK_RIS = process.env.USE_MOCK_RIS === 'true' || !process.env.QIE_API_URL;
 
 /**
  * Create axios instance with default config
@@ -51,11 +52,47 @@ async function retryWithBackoff(fn, attempt = 1) {
 }
 
 /**
+ * Mock data for testing when RIS is not available
+ */
+function getMockLocations(modality) {
+  logger.info('Using MOCK locations data', { modality });
+  return [
+    { id: 'LOC001', name: 'Main Campus Imaging', address: '123 Medical Plaza, Fort Myers, FL' },
+    { id: 'LOC002', name: 'South Fort Myers Clinic', address: '456 Healthcare Blvd, Fort Myers, FL' },
+    { id: 'LOC003', name: 'Cape Coral Imaging Center', address: '789 Wellness Dr, Cape Coral, FL' }
+  ];
+}
+
+function getMockTimeSlots(locationId, modality, startDate, endDate) {
+  logger.info('Using MOCK time slots data', { locationId, modality });
+  const now = new Date();
+  return [
+    { startTime: new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString(), duration: 30 },
+    { startTime: new Date(now.getTime() + 48 * 60 * 60 * 1000).toISOString(), duration: 30 },
+    { startTime: new Date(now.getTime() + 72 * 60 * 60 * 1000).toISOString(), duration: 30 }
+  ];
+}
+
+function getMockBookingConfirmation(bookingData) {
+  logger.info('Using MOCK booking confirmation', { orderId: bookingData.orderId });
+  return {
+    confirmationNumber: `CONF-${Date.now()}`,
+    appointmentId: `APPT-${Date.now()}`,
+    status: 'confirmed'
+  };
+}
+
+/**
  * Get available locations for imaging
  * @param {string} modality - Imaging modality (e.g., 'CT', 'MRI', 'X-RAY')
  * @returns {Promise<Array>} - List of available locations
  */
 async function getLocations(modality) {
+  // Use mock data if RIS not configured
+  if (USE_MOCK_RIS) {
+    return getMockLocations(modality);
+  }
+
   return retryWithBackoff(async () => {
     try {
       logger.info('Fetching available locations from QIE', { modality });
@@ -91,6 +128,11 @@ async function getLocations(modality) {
  * @returns {Promise<Array>} - List of available time slots
  */
 async function getAvailableSlots(locationId, modality, startDate, endDate) {
+  // Use mock data if RIS not configured
+  if (USE_MOCK_RIS) {
+    return getMockTimeSlots(locationId, modality, startDate, endDate);
+  }
+
   return retryWithBackoff(async () => {
     try {
       logger.info('Fetching available slots from QIE', {
@@ -140,6 +182,11 @@ async function getAvailableSlots(locationId, modality, startDate, endDate) {
  * @returns {Promise<Object>} - Booking confirmation
  */
 async function bookAppointment(bookingData) {
+  // Use mock data if RIS not configured
+  if (USE_MOCK_RIS) {
+    return getMockBookingConfirmation(bookingData);
+  }
+
   return retryWithBackoff(async () => {
     try {
       logger.info('Booking appointment via QIE', {
