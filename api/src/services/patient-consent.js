@@ -1,4 +1,4 @@
-const { pool } = require('../db/connection');
+const { getPool } = require('../db/connection');
 const logger = require('../utils/logger');
 const { hashPhoneNumber } = require('../utils/phone-hash');
 const { logSMSInteraction, CONSENT_STATUS } = require('./sms-audit');
@@ -25,6 +25,8 @@ const CONSENT_METHODS = {
  * @returns {Promise<boolean>} - True if consented and not revoked
  */
 async function hasConsent(phoneNumber) {
+  const pool = getPool();
+
   try {
     const phoneHash = hashPhoneNumber(phoneNumber);
 
@@ -55,6 +57,8 @@ async function hasConsent(phoneNumber) {
  * @returns {Promise<Object|null>} - Consent record or null if not found
  */
 async function getConsentInfo(phoneNumber) {
+  const pool = getPool();
+
   try {
     const phoneHash = hashPhoneNumber(phoneNumber);
 
@@ -82,6 +86,8 @@ async function getConsentInfo(phoneNumber) {
  * @returns {Promise<Object>} - Created consent record
  */
 async function recordConsent(phoneNumber, consentMethod = CONSENT_METHODS.SMS_REPLY) {
+  const pool = getPool();
+
   try {
     const phoneHash = hashPhoneNumber(phoneNumber);
 
@@ -134,6 +140,8 @@ async function recordConsent(phoneNumber, consentMethod = CONSENT_METHODS.SMS_RE
  * @returns {Promise<Object>} - Updated consent record
  */
 async function revokeConsent(phoneNumber, reason = 'Patient opted out via SMS STOP') {
+  const pool = getPool();
+
   try {
     const phoneHash = hashPhoneNumber(phoneNumber);
 
@@ -224,6 +232,8 @@ async function requireConsent(phoneNumber) {
  * @returns {Promise<Object>} - Statistics object
  */
 async function getConsentStats() {
+  const pool = getPool();
+
   try {
     const result = await pool.query(
       `SELECT

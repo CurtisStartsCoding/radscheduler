@@ -1,4 +1,4 @@
-const { pool } = require('../db/connection');
+const { getPool } = require('../db/connection');
 const logger = require('../utils/logger');
 const { hashPhoneNumber } = require('../utils/phone-hash');
 
@@ -61,6 +61,8 @@ async function logSMSInteraction({
   success = true,
   errorMessage = null
 }) {
+  const pool = getPool();
+
   try {
     const phoneHash = hashPhoneNumber(phoneNumber);
 
@@ -107,6 +109,8 @@ async function logSMSInteraction({
  * @returns {Promise<Array>} - Audit log entries
  */
 async function getAuditLogForPhone(phoneNumber, limit = 100) {
+  const pool = getPool();
+
   try {
     const phoneHash = hashPhoneNumber(phoneNumber);
 
@@ -136,6 +140,8 @@ async function getAuditLogForPhone(phoneNumber, limit = 100) {
  * @returns {Promise<Object>} - Statistics object
  */
 async function getAuditStats(startDate, endDate) {
+  const pool = getPool();
+
   try {
     const result = await pool.query(
       `SELECT
@@ -166,6 +172,8 @@ async function getAuditStats(startDate, endDate) {
  * @returns {Promise<number>} - Number of records deleted
  */
 async function cleanupOldAuditLogs() {
+  const pool = getPool();
+
   try {
     const retentionDays = parseInt(process.env.SMS_AUDIT_RETENTION_DAYS) || 2555; // 7 years default
 

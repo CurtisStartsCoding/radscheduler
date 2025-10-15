@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { query } = require('../db/connection');
+const { getPool } = require('../db/connection');
 const { sendSMS } = require('../services/notifications');
 const logger = require('../utils/logger');
 const Joi = require('joi');
@@ -56,7 +56,8 @@ router.get('/available-slots', async (req, res) => {
     const businessHours = config.businessHours;
 
     // Get existing appointments for the date
-    const existingAppointments = await query(`
+    const pool = getPool();
+    const existingAppointments = await pool.query(`
       SELECT datetime, modality 
       FROM appointments 
       WHERE DATE(datetime) = $1 
@@ -152,7 +153,8 @@ router.post('/book-appointment', async (req, res) => {
     const appointmentDateTime = new Date(`${preferredDate}T${preferredTime}:00`);
 
     // Check if slot is still available
-    const existingAppointments = await query(`
+    const pool = getPool();
+    const existingAppointments = await pool.query(`
       SELECT id FROM appointments 
       WHERE datetime = $1 
       AND status != 'CANCELLED'
@@ -166,7 +168,7 @@ router.post('/book-appointment', async (req, res) => {
     }
 
     // Create appointment
-    const result = await query(`
+    const result = await pool.query(`
       INSERT INTO appointments (
         patient_name, patient_phone, patient_email, modality, study_type,
         datetime, status, urgency, notes, source
@@ -248,7 +250,8 @@ router.get('/my-appointments', async (req, res) => {
   }
 
   try {
-    const result = await query(`
+    const pool = getPool();
+    const result = await pool.query(`
       SELECT id, patient_name, modality, study_type, datetime, status, notes
       FROM appointments 
       WHERE patient_phone = $1 
@@ -281,8 +284,9 @@ router.post('/cancel-appointment', async (req, res) => {
   }
 
   try {
+    const pool = getPool();
     // Verify patient owns the appointment
-    const appointment = await query(`
+    const appointment = await pool.query(`
       SELECT id, patient_name, datetime, modality, study_type
       FROM appointments 
       WHERE id = $1 AND patient_phone = $2
@@ -296,7 +300,7 @@ router.post('/cancel-appointment', async (req, res) => {
     }
 
     // Cancel the appointment
-    await query(`
+    await pool.query(`
       UPDATE appointments 
       SET status = 'CANCELLED', notes = CONCAT(COALESCE(notes, ''), ' - Cancelled by patient')
       WHERE id = $1

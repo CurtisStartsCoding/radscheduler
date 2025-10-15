@@ -1,4 +1,4 @@
-const { pool } = require('../db/connection');
+const { getPool } = require('../db/connection');
 const logger = require('../utils/logger');
 
 /**
@@ -12,6 +12,8 @@ const logger = require('../utils/logger');
  * @returns {Promise<number>} - Number of sessions expired
  */
 async function cleanupExpiredSessions() {
+  const pool = getPool();
+
   try {
     const result = await pool.query('SELECT cleanup_expired_sms_sessions()');
     const expiredCount = result.rows[0].cleanup_expired_sms_sessions;

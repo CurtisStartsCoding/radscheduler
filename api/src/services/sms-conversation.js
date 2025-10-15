@@ -1,4 +1,4 @@
-const { pool } = require('../db/connection');
+const { getPool } = require('../db/connection');
 const logger = require('../utils/logger');
 const { hashPhoneNumber } = require('../utils/phone-hash');
 const { sendSMS } = require('./notifications');
@@ -34,6 +34,8 @@ const SESSION_TTL_HOURS = parseInt(process.env.SMS_SESSION_TTL_HOURS) || 24;
  * @returns {Promise<Object>} - Created conversation
  */
 async function startConversation(phoneNumber, orderData) {
+  const pool = getPool();
+
   try {
     const phoneHash = hashPhoneNumber(phoneNumber);
     const expiresAt = new Date(Date.now() + SESSION_TTL_HOURS * 60 * 60 * 1000);
@@ -102,6 +104,8 @@ async function sendConsentRequest(phoneNumber, conversation) {
  * Send location selection options
  */
 async function sendLocationOptions(phoneNumber, conversation) {
+  const pool = getPool();
+
   try {
     const orderData = typeof conversation.order_data === 'string'
       ? JSON.parse(conversation.order_data)
@@ -153,6 +157,8 @@ async function sendLocationOptions(phoneNumber, conversation) {
  * Send time slot selection options
  */
 async function sendTimeSlotOptions(phoneNumber, conversation) {
+  const pool = getPool();
+
   try {
     const orderData = typeof conversation.order_data === 'string'
       ? JSON.parse(conversation.order_data)
@@ -308,6 +314,7 @@ async function handleConsentResponse(phoneNumber, conversation, message) {
  * Handle location selection
  */
 async function handleLocationSelection(phoneNumber, conversation, message) {
+  const pool = getPool();
   const selection = parseInt(message);
 
   if (isNaN(selection) || selection < 1 || selection > 5) {
@@ -356,6 +363,7 @@ async function handleLocationSelection(phoneNumber, conversation, message) {
  * Handle time slot selection and book appointment
  */
 async function handleTimeSelection(phoneNumber, conversation, message) {
+  const pool = getPool();
   const selection = parseInt(message);
 
   if (isNaN(selection) || selection < 1 || selection > 5) {
@@ -434,6 +442,7 @@ async function handleTimeSelection(phoneNumber, conversation, message) {
  * Get active conversation for a phone number
  */
 async function getActiveConversation(phoneHash) {
+  const pool = getPool();
   const result = await pool.query(
     `SELECT * FROM sms_conversations
      WHERE phone_hash = $1
@@ -451,6 +460,7 @@ async function getActiveConversation(phoneHash) {
  * Update conversation state
  */
 async function updateConversationState(conversationId, newState) {
+  const pool = getPool();
   await pool.query(
     `UPDATE sms_conversations
      SET state = $1, updated_at = CURRENT_TIMESTAMP
