@@ -132,30 +132,39 @@ http://3.21.14.188:3010/api/sms/webhook
 Enable Twilio to deliver inbound SMS by exposing RadScheduler via HTTPS with proper domain.
 
 ### Requirements
-1. **Domain name** for RadScheduler (e.g., `radscheduler.yourdomain.com`)
-2. **SSL certificate** (Let's Encrypt recommended)
-3. **Nginx reverse proxy** on EC2
+1. **Domain name** for RadScheduler: `scheduler.radorderpad.com`
+2. **SSL certificate** (Let's Encrypt - auto-configured like other subdomains)
+3. **Nginx reverse proxy** on EC2 (already set up for other services)
 4. **Twilio webhook configuration**
 
 ### Architecture
 ```
 Twilio SMS
     ↓ HTTPS
-radscheduler.yourdomain.com (Nginx :443)
+scheduler.radorderpad.com (Nginx :443)
     ↓ HTTP
 localhost:3010 (RadScheduler API)
     ↓
 radorder_main database
 ```
 
+### Existing Reverse Proxy Setup
+RadOrderPad already has nginx configured with SSL for:
+- ✅ radorderpad.com → localhost:5000/5001 (landing page)
+- ✅ app.radorderpad.com → localhost:3000 (frontend)
+- ✅ trial.radorderpad.com → localhost:3001 (trial)
+- ✅ api.radorderpad.com → external API
+
+RadScheduler will follow the same pattern.
+
 ---
 
 ## 📋 Reverse Proxy Setup Checklist
 
 ### Step 1: DNS Configuration
-- [ ] Create A record: `radscheduler.yourdomain.com` → `3.21.14.188`
+- [ ] Create A record: `scheduler.radorderpad.com` → `3.21.14.188`
 - [ ] Wait for DNS propagation (5-15 minutes)
-- [ ] Verify: `nslookup radscheduler.yourdomain.com`
+- [ ] Verify: `nslookup scheduler.radorderpad.com`
 
 ### Step 2: EC2 Security Group
 - [ ] Allow inbound TCP port 443 (HTTPS) from anywhere
@@ -177,12 +186,12 @@ sudo apt install certbot python3-certbot-nginx -y
 ```
 
 ### Step 5: Configure Nginx for RadScheduler
-Create: `/etc/nginx/sites-available/radscheduler`
+Create: `/etc/nginx/sites-available/scheduler.radorderpad.com`
 
 ```nginx
 server {
     listen 80;
-    server_name radscheduler.yourdomain.com;
+    server_name scheduler.radorderpad.com;
 
     # Let's Encrypt will add SSL config here
 
@@ -207,14 +216,14 @@ server {
 
 Enable site:
 ```bash
-sudo ln -s /etc/nginx/sites-available/radscheduler /etc/nginx/sites-enabled/
+sudo ln -s /etc/nginx/sites-available/scheduler.radorderpad.com /etc/nginx/sites-enabled/
 sudo nginx -t
 sudo systemctl reload nginx
 ```
 
 ### Step 6: Obtain SSL Certificate
 ```bash
-sudo certbot --nginx -d radscheduler.yourdomain.com
+sudo certbot --nginx -d scheduler.radorderpad.com
 ```
 
 Follow prompts:
@@ -224,7 +233,7 @@ Follow prompts:
 
 ### Step 7: Verify HTTPS Access
 ```bash
-curl https://radscheduler.yourdomain.com/health
+curl https://scheduler.radorderpad.com/health
 ```
 
 Expected response:
@@ -242,11 +251,11 @@ Expected response:
 
 1. Log into Twilio Console: https://console.twilio.com
 2. Navigate to: Phone Numbers → Manage → Active Numbers
-3. Click your number: +12393825683
+3. Click your number: +1239382[REDACTED]
 4. Scroll to "Messaging Configuration"
 5. Set "A MESSAGE COMES IN" webhook:
    ```
-   https://radscheduler.yourdomain.com/api/sms/webhook
+   https://scheduler.radorderpad.com/api/sms/webhook
    ```
 6. Method: `HTTP POST`
 7. Save changes
@@ -255,7 +264,7 @@ Expected response:
 
 **Trigger new conversation:**
 ```bash
-curl -X POST https://radscheduler.yourdomain.com/api/orders/webhook \
+curl -X POST https://scheduler.radorderpad.com/api/orders/webhook \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer radscheduler-webhook-secret-phase52-production-2025" \
   -d '{
