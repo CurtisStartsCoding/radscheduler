@@ -3,33 +3,22 @@ const cors = require('cors');
 const helmet = require('helmet');
 const compression = require('compression');
 const { createServer } = require('http');
-const { Server } = require('socket.io');
 const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 
 const { connectDB } = require('./db/connection');
-const { connectRedis } = require('./services/redis');
-const { setupWebSocket } = require('./services/websocket');
 const logger = require('./utils/logger');
+const { startCleanupJob } = require('./services/session-cleanup');
 
 // Route imports
-const hl7Routes = require('./routes/hl7');
-const appointmentRoutes = require('./routes/appointments');
-const analyticsRoutes = require('./routes/analytics');
-const demoRoutes = require('./routes/demo');
-const clinicalRoutes = require('./routes/clinical-integration');
 const authRoutes = require('./routes/auth');
-const avreoRoutes = require('./routes/avreo-integration');
+const appointmentRoutes = require('./routes/appointments');
 const patientSchedulingRoutes = require('./routes/patient-scheduling');
+const smsWebhookRoutes = require('./routes/sms-webhook');
+const orderWebhookRoutes = require('./routes/order-webhook');
 
 const app = express();
 const httpServer = createServer(app);
-const io = new Server(httpServer, {
-  cors: {
-    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
-    credentials: true
-  }
-});
 
 // Middleware
 app.use(helmet());
@@ -58,21 +47,19 @@ app.use('/api/', limiter);
 
 // Health check
 app.get('/health', (req, res) => {
-  res.json({ 
-    status: 'healthy', 
+  res.json({
+    status: 'healthy',
     timestamp: new Date().toISOString(),
     services: {
-      database: 'connected',
-      redis: 'connected',
-      websocket: 'active'
+      database: 'connected'
     }
   });
 });
 
 // Required environment variable check
 const requiredEnv = [
-  'DATABASE_URL', 'REDIS_URL', 'TWILIO_ACCOUNT_SID', 'TWILIO_AUTH_TOKEN',
-  'TWILIO_PHONE_NUMBER', 'ANTHROPIC_API_KEY'
+  'DATABASE_URL', 'TWILIO_ACCOUNT_SID', 'TWILIO_AUTH_TOKEN',
+  'TWILIO_PHONE_NUMBER'
 ];
 requiredEnv.forEach((key) => {
   if (!process.env[key]) {
@@ -83,19 +70,10 @@ requiredEnv.forEach((key) => {
 
 // Routes
 app.use('/api/auth', authRoutes);
-app.use('/api/hl7', hl7Routes);
 app.use('/api/appointments', appointmentRoutes);
-app.use('/api/analytics', analyticsRoutes);
-app.use('/api/clinical', clinicalRoutes);
-app.use('/api/avreo', avreoRoutes);
 app.use('/api/patient', patientSchedulingRoutes);
-
-// Only mount demo endpoints in non-production
-if (process.env.NODE_ENV !== 'production') {
-  app.use('/api/demo', demoRoutes);
-  // Optionally, only allow /api/hl7/simulate in non-production
-  // app.use('/api/hl7/simulate', hl7Routes); // If simulate is a separate route
-}
+app.use('/api/sms', smsWebhookRoutes);
+app.use('/api/orders', orderWebhookRoutes);
 
 // Error handling
 app.use((err, req, res, next) => {
@@ -107,21 +85,22 @@ app.use((err, req, res, next) => {
 });
 
 // Initialize services
+let cleanupJobId = null;
+
 async function startServer() {
   try {
-    // Connect to databases
+    // Connect to database
     await connectDB();
-    await connectRedis();
-    
-    // Setup WebSocket
-    setupWebSocket(io);
-    
+
+    // Start session cleanup job
+    cleanupJobId = startCleanupJob();
+
     // Start server
     const PORT = process.env.PORT || 3001;
     httpServer.listen(PORT, () => {
       logger.info(`RadScheduler API running on port ${PORT}`);
-      logger.info(`WebSocket server active`);
       logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
+      logger.info(`SMS scheduling system active`);
     });
     
     // Graceful shutdown
@@ -136,6 +115,13 @@ async function startServer() {
 
 async function shutdown() {
   logger.info('Shutting down gracefully...');
+
+  // Stop cleanup job
+  if (cleanupJobId) {
+    const { stopCleanupJob } = require('./services/session-cleanup');
+    stopCleanupJob(cleanupJobId);
+  }
+
   httpServer.close(() => {
     logger.info('Server closed');
     process.exit(0);
