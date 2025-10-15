@@ -47,7 +47,7 @@ postgresql://postgres:password@radorderpad-main-db.czi6ewycqxzy.us-east-2.rds.am
 
 ### 3. Deployment Automation
 **Created:** `deploy.sh` - Simple SCP-based deployment script
-**Created:** `DEPLOYMENT.md` - Complete deployment documentation
+**Created:** `DEPLOYMENT.md` (now `../deployment-guide.md`) - Complete deployment documentation
 **Created:** `migrate.js` - Simple database migration runner
 
 **Deployment workflow:**
@@ -480,13 +480,13 @@ Once SMS flow works end-to-end:
 
 ### New Files
 - `deploy.sh` - Deployment automation script
-- `DEPLOYMENT.md` - Deployment documentation
+- `DEPLOYMENT.md` (now `../deployment-guide.md`) - Deployment documentation
 - `migrate.js` - Database migration runner
 - `fix-schema.js` - Schema cleanup utility
 - `cleanup-phi-db.js` - PHI database cleanup
 - `verify-main-db.js` - Database verification
-- `PHASE-4-TESTING-PROGRESS.md` - This document
-- `REVERSE-PROXY-TEST-RESULTS.md` - Comprehensive reverse proxy testing documentation
+- `PHASE-4-TESTING-PROGRESS.md` (now `phase-4-testing.md`) - This document
+- `REVERSE-PROXY-TEST-RESULTS.md` (now `reverse-proxy-tests.md`) - Comprehensive reverse proxy testing documentation
 
 ### Modified Files (Session 1 - Database Fixes)
 - `api/src/services/sms-conversation.js` - Fixed pool imports, added order deduplication

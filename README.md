@@ -325,22 +325,26 @@ QIE_API_URL=http://qie.internal:8082/api/ris
 
 ## 📚 Documentation
 
-### Implementation & Testing
-- **[Phase 4 Testing Progress](PHASE-4-TESTING-PROGRESS.md)** - Complete testing report with all features verified
-- **[Reverse Proxy Test Results](REVERSE-PROXY-TEST-RESULTS.md)** - Infrastructure testing and verification
-- **[Deployment Guide](DEPLOYMENT.md)** - Production deployment instructions
+**See [docs/README.md](docs/README.md) for complete documentation index**
 
-### Planning & Architecture
-- **[Hardening Plan](radscheduler-hardening-plan.md)** - Complete security and architecture hardening plan
-- **[Legacy Docs Cleanup](LEGACY-DOCS-TO-DELETE-OR-UPDATE.md)** - Documentation cleanup guide
-- **[Phase 5.2 Spec](../radorderpad-api/final-documentation/qvera/phase-5.2-radscheduler-sms-epic.md)** - Full implementation specification
+### Architecture & Planning
+- **[Architecture Hardening Plan](docs/architecture-hardening-plan.md)** - Complete security and architecture hardening plan for Phase 5.2, including implementation details and comparison with old architecture
 
-### Additional Resources
-- **[AWS Deployment Guide](docs/aws-deployment-guide.md)** - EC2 and RDS setup
-- **[Production Checklist](docs/production-checklist.md)** - Pre-launch verification
+### Deployment & Operations
+- **[Deployment Guide](docs/deployment-guide.md)** - Production deployment using bash script, EC2, PM2, and nginx reverse proxy with troubleshooting
+- **[Security Review](docs/security-review.md)** - Current security status, completed hardening tasks, and infrastructure setup
 
-### Legacy Documentation
-Legacy documentation for the old HL7/AI/RIS integration architecture has been removed. If needed for reference, it's preserved in git history at commit `backup-voice-ai-sept21`.
+### Testing & Quality Assurance
+- **[Phase 4 Testing Report](docs/reports/phase-4-testing.md)** - Complete testing report with all features verified (SMS flow, consent, audit logging, webhooks)
+- **[Reverse Proxy Tests](docs/reports/reverse-proxy-tests.md)** - Infrastructure testing and nginx reverse proxy verification
+
+### Audits & Compliance
+- **[Dependency Audit (2025-10-15)](docs/audits/2025-10-15-dependency-audit.md)** - Dependency cleanup report, security audit results, and production readiness assessment
+
+### External Documentation
+- **[Phase 5.2 Specification](../radorderpad-api/final-documentation/qvera/phase-5.2-radscheduler-sms-epic.md)** - Full implementation specification
+- **[QIE Tutorial](../radorderpad-api/final-documentation/qvera/qie-tutorial.txt)** - QIE Interface Engine guide
+- **[QIE JavaScript Tutorial](../radorderpad-api/final-documentation/qvera/qie-javascript-tutorial.txt)** - QIE scripting guide
 
 ---
 
