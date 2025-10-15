@@ -1,5 +1,6 @@
 const twilio = require('twilio');
 const logger = require('../utils/logger');
+const { hashPhoneNumber, getPhoneLast4 } = require('../utils/phone-hash');
 
 class NotificationService {
   constructor() {
@@ -25,20 +26,28 @@ class NotificationService {
       }
 
       if (typeof to !== 'string' || to.trim() === '') {
-        logger.error('SMS send failed: Invalid recipient phone number format', { to, type: typeof to });
+        logger.error('SMS send failed: Invalid recipient phone number format', {
+          type: typeof to,
+          isEmpty: to === '' || (typeof to === 'string' && to.trim() === '')
+        });
         throw new Error('Invalid recipient phone number format');
       }
 
-      // Log the parameters being sent to Twilio for debugging
-      logger.info('Attempting to send SMS', { 
-        to: to, 
+      // Log the parameters being sent to Twilio for debugging (HIPAA compliant)
+      logger.info('Attempting to send SMS', {
+        phoneHash: hashPhoneNumber(to),
+        phoneLast4: getPhoneLast4(to),
         from: this.fromNumber,
         messageLength: message ? message.length : 0,
-        enabled: this.enabled 
+        enabled: this.enabled
       });
 
       if (!this.enabled) {
-        logger.info('SMS (simulated):', { to, message });
+        logger.info('SMS (simulated)', {
+          phoneHash: hashPhoneNumber(to),
+          phoneLast4: getPhoneLast4(to),
+          messageLength: message ? message.length : 0
+        });
         return { sid: 'SIMULATED_' + Date.now(), status: 'sent' };
       }
 
@@ -48,18 +57,20 @@ class NotificationService {
         to: to
       });
 
-      logger.info('SMS sent successfully', { 
-        sid: result.sid, 
-        to: to.slice(-4) 
+      logger.info('SMS sent successfully', {
+        sid: result.sid,
+        phoneHash: hashPhoneNumber(to),
+        phoneLast4: getPhoneLast4(to)
       });
 
       return result;
     } catch (error) {
-      logger.error('SMS send failed:', error.message);
-      
-      // Fallback to console for demo
-      logger.info('SMS FALLBACK - Would have sent:', { to, message });
-      
+      logger.error('SMS send failed', {
+        error: error.message,
+        phoneHash: hashPhoneNumber(to),
+        phoneLast4: getPhoneLast4(to)
+      });
+
       throw error;
     }
   }
