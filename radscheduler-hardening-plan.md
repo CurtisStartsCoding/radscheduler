@@ -21,12 +21,14 @@ RadScheduler must be hardened from a general-purpose RIS integration system to a
 - **Architecture:** Multi-tenant RIS integration with direct vendor adapters
 - **Purpose:** Originally designed for multiple RIS vendors and HL7 processing
 
-### Phase 5.2 Requirements (Per Documentation)
-1. Receive webhook from RadOrderPad when order created
+### Phase 5.2 Requirements (Per Documentation - UPDATED OCT 15)
+1. Receive webhook from Mock RIS when order enters pending queue (NOT from RadOrderPad)
 2. Manage SMS conversations with patients (consent → location → time → confirm)
 3. Call QIE REST endpoints (QIE handles all RIS communication)
 4. Store conversation state in PostgreSQL only (NO Redis)
 5. Log everything for HIPAA compliance with phone number hashing
+
+**Architecture Change (Oct 15):** Based on RIS vendor research, Mock RIS triggers RadScheduler (not RadOrderPad). This matches real-world RIS behavior where orders enter a pending queue and trigger scheduling outreach.
 
 ---
 
@@ -191,6 +193,14 @@ Per Phase 5.2 specification (lines 480-484):
 - POST /api/ris/book-appointment
 - Retry logic with exponential backoff
 
+### 6. `api/src/routes/order-webhook.js` **[NEW - PRODUCTION CRITICAL]**
+- Receives webhook from Mock RIS when order enters pending queue
+- Validates Bearer token or HMAC signature for security
+- Extracts order data: orderId, patientPhone, modality, priority, queuedAt
+- Initiates SMS conversation flow via sms-conversation.js
+- Returns 200 OK or appropriate error status
+- **Why Critical:** This is the trigger point for the entire SMS scheduling workflow
+
 ---
 
 ## DEPENDENCIES
@@ -243,7 +253,8 @@ Per Phase 5.2 specification (lines 480-484):
 3. Create patient-consent.js with hashed storage
 4. Create sms-audit.js with HIPAA compliance
 5. Create ris-api-client.js for QIE integration
-6. Update server.js to mount new routes
+6. Create order-webhook.js for Mock RIS triggers (NEW)
+7. Update server.js to mount new routes
 
 ### Phase 4: Testing & Hardening (2-3 hours)
 1. Test SMS conversation flow end-to-end
@@ -327,6 +338,9 @@ SMS_SESSION_TTL_HOURS=24
 SMS_MAX_RETRY_ATTEMPTS=3
 SMS_AUDIT_RETENTION_DAYS=2555  # 7 years
 
+# Order Webhook Security (Mock RIS → RadScheduler)
+ORDER_WEBHOOK_SECRET=your-secure-webhook-secret-min-32-chars
+
 # Auth (if keeping multi-user)
 JWT_SECRET=your_jwt_secret
 BCRYPT_ROUNDS=10
@@ -369,9 +383,11 @@ AVREO_API_KEY         # Obsolete
 ## FINAL RESULT
 
 **Before:** Multi-purpose RIS integration system with 35 files
-**After:** Bulletproof SMS scheduling system with 18 files + 5 new SMS-specific files
+**After:** Bulletproof SMS scheduling system with 18 files + 6 new SMS-specific files
 
-Total: **23 files** focused exclusively on HIPAA-compliant SMS patient self-scheduling.
+Total: **24 files** focused exclusively on HIPAA-compliant SMS patient self-scheduling.
+
+**Key Addition (Oct 15):** order-webhook.js endpoint enables Mock RIS to trigger SMS flow when orders enter pending queue - matches real RIS vendor behavior.
 
 ---
 
