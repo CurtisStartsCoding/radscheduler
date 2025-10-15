@@ -126,6 +126,42 @@ RadScheduler uses the **same HIPAA-compliant model** as major health systems nat
 - Automatic EHR updates
 - No duplicate scheduling systems
 
+### Vendor-Agnostic Architecture via QIE
+
+**The Key Differentiator: Your EMR Doesn't Matter**
+
+RadScheduler's architecture is intentionally vendor-agnostic. The Qvera Interface Engine (QIE) acts as a universal translator:
+
+**How It Works:**
+- **RadScheduler speaks REST** - Modern API calls to QIE
+- **QIE translates to HL7** - Converts to whatever format your RIS and EMR expect
+- **QIE translates back to REST** - Returns data to RadScheduler in standard JSON
+
+**This Means:**
+- ✅ **Works with Epic** - QIE routes SIU messages to Epic
+- ✅ **Works with Cerner** - QIE routes SIU messages to Cerner
+- ✅ **Works with Allscripts** - QIE routes SIU messages to Allscripts
+- ✅ **Works with any HL7-capable EMR** - QIE handles the translation
+
+**Why This Matters:**
+
+**No Vendor Lock-In:**
+- Switch EMRs in the future? No RadScheduler changes required
+- QIE reconfiguration handles new EMR integration
+- RadScheduler code stays vendor-neutral
+
+**Multi-Site Organizations:**
+- One practice uses Epic, another uses athena? Same RadScheduler instance works for both
+- QIE routes to correct EMR per facility
+- Single SMS scheduling platform across your organization
+
+**Proven Integration Pattern:**
+- QIE is certified for Epic, Cerner, athena, Allscripts, and 100+ other systems
+- Standard HL7 SIU messages work universally
+- No custom code per EMR vendor
+
+**Bottom Line:** We integrate with your **RIS** (Fuji Synapse). Your EMR is just a routing destination in QIE. The same RadScheduler deployment works regardless of EMR vendor.
+
 ---
 
 ## Business Impact

@@ -149,6 +149,107 @@ NTE|1||X-ray scheduled at Downtown Imaging
 
 ---
 
+## Vendor-Agnostic Architecture: EMR Independence
+
+### The QIE Advantage
+
+**Key Architectural Principle:** RadScheduler integrates with your **RIS**, not your **EMR**.
+
+Your EMR (athenahealth, Epic, Cerner, etc.) is just a **routing destination** in QIE. The same RadScheduler deployment works regardless of EMR vendor.
+
+### How Vendor-Agnosticism Works
+
+**RadScheduler Layer:**
+- Sends/receives REST API calls to QIE
+- Vendor-neutral JSON data format
+- No EMR-specific code
+
+**QIE Translation Layer:**
+- Accepts REST from RadScheduler
+- Translates to HL7 for RIS (Fuji Synapse)
+- Translates RIS responses back to JSON for RadScheduler
+- Routes HL7 SIU messages to correct EMR endpoint
+
+**EMR Layer:**
+- Receives standard HL7 SIU^S12 messages
+- Epic, Cerner, athena all accept same HL7 format
+- No EMR modifications required
+
+### Supported EMR Vendors
+
+**Tested/Validated:**
+- athenahealth (athenaOne, athenaNet)
+- Epic (2015+, Community Connect, on FHIR)
+
+**Compatible (Standard HL7 SIU):**
+- Cerner (PowerChart, Millennium)
+- Allscripts (Sunrise, Professional, TouchWorks)
+- NextGen Healthcare
+- eClinicalWorks
+- Meditech
+- Any EMR supporting HL7 v2.3+ SIU messages
+
+**QIE Handles:**
+- Message format differences (HL7 2.3 vs 2.5.1 vs 2.7)
+- Vendor-specific field requirements
+- Character encoding variations
+- Acknowledgment handling (ACK/NACK)
+
+### Multi-EMR Scenarios
+
+**Scenario 1: Single Practice, One EMR**
+- Configure QIE with single outbound SIU channel → your EMR
+- RadScheduler unaware of EMR vendor
+
+**Scenario 2: Multi-Site Organization, Different EMRs**
+- Site A uses Epic, Site B uses athena
+- QIE routes SIU to correct EMR based on facility identifier
+- Single RadScheduler instance serves both sites
+
+**Scenario 3: EMR Migration**
+- Practice switches from athena to Epic
+- RadScheduler code: **Zero changes**
+- QIE configuration: Update routing channel to Epic endpoint
+- Testing: Validate SIU messages reach Epic correctly
+
+### Technical Benefits
+
+**No Custom Code Per Vendor:**
+- Same RadScheduler codebase for all clients
+- No "Epic version" vs "athena version"
+- Faster deployments, easier maintenance
+
+**Future-Proof:**
+- New EMR vendor? Configure QIE channel, done
+- EMR upgrades (e.g., Epic 2023 → 2024)? QIE handles compatibility
+- RadScheduler deployment remains untouched
+
+**Vendor Certification:**
+- QIE is certified by Epic, Cerner, athena, Allscripts
+- Standard HL7 interfaces mean universal compatibility
+- No vendor-specific approval required for RadScheduler
+
+### What Your Team Configures
+
+**For Any EMR:**
+1. QIE outbound channel to EMR's HL7 endpoint
+2. Facility/organization identifiers
+3. EMR-specific field mappings (if required)
+4. Acknowledgment handling rules
+
+**RadScheduler Configuration:**
+- Same regardless of EMR vendor
+- REST API endpoint to QIE (standard across all deployments)
+- No EMR-specific settings
+
+### Bottom Line for IT
+
+**Question:** "Does this work with our EMR (Epic/Cerner/athena/etc.)?"
+
+**Answer:** Yes, if your EMR accepts standard HL7 SIU messages. The integration is with your RIS (Fuji Synapse). QIE routes appointment confirmations to whatever EMR you use. We've validated with athenahealth and Epic; all other HL7-capable EMRs work the same way.
+
+---
+
 ## QIE (Qvera Interface Engine) Requirements
 
 **Why QIE?**
