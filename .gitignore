@@ -80,3 +80,6 @@ web/.next/
 # API keys and secrets
 api/.env
 web/.env.local 
+# Private keys
+*.pem
+*.key
