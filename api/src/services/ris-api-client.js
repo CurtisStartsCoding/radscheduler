@@ -65,11 +65,24 @@ function getMockLocations(modality) {
 
 function getMockTimeSlots(locationId, modality, startDate, endDate) {
   logger.info('Using MOCK time slots data', { locationId, modality });
-  const now = new Date();
+
+  // Generate realistic appointment times (9 AM, 2 PM, 10 AM over next 3 days)
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  tomorrow.setHours(9, 0, 0, 0); // 9:00 AM tomorrow
+
+  const dayAfter = new Date();
+  dayAfter.setDate(dayAfter.getDate() + 2);
+  dayAfter.setHours(14, 0, 0, 0); // 2:00 PM day after tomorrow
+
+  const threeDays = new Date();
+  threeDays.setDate(threeDays.getDate() + 3);
+  threeDays.setHours(10, 0, 0, 0); // 10:00 AM in 3 days
+
   return [
-    { startTime: new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString(), duration: 30 },
-    { startTime: new Date(now.getTime() + 48 * 60 * 60 * 1000).toISOString(), duration: 30 },
-    { startTime: new Date(now.getTime() + 72 * 60 * 60 * 1000).toISOString(), duration: 30 }
+    { startTime: tomorrow.toISOString(), duration: 30 },
+    { startTime: dayAfter.toISOString(), duration: 30 },
+    { startTime: threeDays.toISOString(), duration: 30 }
   ];
 }
 
@@ -135,29 +148,39 @@ async function getAvailableSlots(locationId, modality, startDate, endDate) {
 
   return retryWithBackoff(async () => {
     try {
-      logger.info('Fetching available slots from QIE', {
-        locationId,
-        modality,
-        startDate: startDate.toISOString(),
-        endDate: endDate.toISOString()
+      // Mock RIS expects: location (not locationId), modality (lowercase), date (YYYY-MM-DD)
+      const dateStr = startDate.toISOString().split('T')[0]; // 2025-10-17
+
+      logger.info('Fetching available slots from Mock RIS', {
+        location: locationId,
+        modality: modality.toLowerCase(),
+        date: dateStr
       });
 
       const response = await qieClient.get('/available-slots', {
         params: {
-          locationId,
-          modality,
-          startDate: startDate.toISOString(),
-          endDate: endDate.toISOString()
+          location: locationId,  // Mock RIS uses "location" not "locationId"
+          modality: modality.toLowerCase(),  // Mock RIS uses lowercase
+          date: dateStr  // Mock RIS uses single date, not start/end
         }
       });
 
-      logger.info('Slots retrieved from QIE', {
+      logger.info('Slots retrieved from Mock RIS', {
         locationId,
         modality,
         slotCount: response.data.slots?.length || 0
       });
 
-      return response.data.slots || [];
+      // Map Mock RIS response format to RadScheduler format
+      const slots = (response.data.slots || []).map(slot => ({
+        startTime: slot.datetime,  // Mock RIS uses "datetime", we need "startTime"
+        duration: slot.duration,
+        displayTime: slot.displayTime,
+        id: slot.id,
+        available: slot.available
+      }));
+
+      return slots;
     } catch (error) {
       logger.error('Failed to get available slots from QIE', {
         locationId,
@@ -189,30 +212,36 @@ async function bookAppointment(bookingData) {
 
   return retryWithBackoff(async () => {
     try {
-      logger.info('Booking appointment via QIE', {
+      logger.info('Booking appointment via Mock RIS', {
         orderId: bookingData.orderId,
-        locationId: bookingData.locationId,
+        location: bookingData.locationId,
         modality: bookingData.modality,
-        appointmentTime: bookingData.appointmentTime
+        datetime: bookingData.appointmentTime
       });
 
+      // Mock RIS expects: orderId, patientPhone, patientName, modality, location, slotId, datetime
       const response = await qieClient.post('/book-appointment', {
         orderId: bookingData.orderId,
-        patientId: bookingData.patientId,
-        locationId: bookingData.locationId,
-        modality: bookingData.modality,
-        appointmentTime: bookingData.appointmentTime,
-        phoneNumber: bookingData.phoneNumber,
-        source: 'SMS_SELF_SCHEDULING'
+        patientPhone: bookingData.phoneNumber,
+        patientName: bookingData.patientName || 'Patient',  // Optional
+        modality: bookingData.modality.toLowerCase(),
+        location: bookingData.locationId,  // Mock RIS uses "location" not "locationId"
+        slotId: bookingData.slotId,  // Required by Mock RIS
+        datetime: bookingData.appointmentTime
       });
 
-      logger.info('Appointment booked successfully via QIE', {
+      logger.info('Appointment booked successfully via Mock RIS', {
         orderId: bookingData.orderId,
-        confirmationNumber: response.data.confirmationNumber,
-        appointmentId: response.data.appointmentId
+        confirmationCode: response.data.appointment?.confirmationCode,
+        appointmentId: response.data.appointment?.appointmentId
       });
 
-      return response.data;
+      // Return in expected format
+      return {
+        confirmationNumber: response.data.appointment?.confirmationCode,
+        appointmentId: response.data.appointment?.appointmentId,
+        status: 'confirmed'
+      };
     } catch (error) {
       logger.error('Failed to book appointment via QIE', {
         orderId: bookingData.orderId,

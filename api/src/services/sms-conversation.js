@@ -389,6 +389,7 @@ async function handleTimeSelection(phoneNumber, conversation, message) {
       patientId: orderData.patientId,
       locationId: conversation.selected_location_id,
       modality: orderData.modality,
+      slotId: selectedSlot.id,  // Required by Mock RIS
       appointmentTime: selectedSlot.startTime,
       phoneNumber
     });
