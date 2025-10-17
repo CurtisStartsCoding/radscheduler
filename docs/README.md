@@ -16,6 +16,8 @@ For project overview, quick start, and features, see the **[Main README](../READ
 
 ### Architecture & Planning
 - **[Architecture Hardening Plan](architecture-hardening-plan.md)** - Complete security and architecture hardening plan for Phase 5.2, including implementation details and Phase 5.2 vs old architecture comparison
+- **[Integration Architecture Plan](INTEGRATION-ARCHITECTURE-PLAN.md)** - QIE/Qvera integration layer design for data normalization, modality mapping, and vendor-agnostic RIS communication
+- **[Multi-Procedure Scheduling](MULTI-PROCEDURE-SCHEDULING.md)** - Architecture for handling grouped procedures (multiple imaging exams in one order) with duration-aware slot booking and SMS workflow
 
 ### Deployment & Operations
 - **[Deployment Guide](deployment-guide.md)** - Production deployment using bash script, EC2, PM2, and nginx reverse proxy. Includes troubleshooting and rollback procedures
