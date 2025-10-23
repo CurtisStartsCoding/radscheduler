@@ -70,11 +70,18 @@ router.post('/webhook', express.json(), validateWebhookAuth, async (req, res) =>
   try {
     const {
       orderId,
+      orderGroupId,         // NEW: for multi-procedure grouping
+      orderSequence,        // NEW: position in group
+      totalInGroup,         // NEW: total procedures
+      procedures,           // NEW: array of all procedures
+      estimatedDuration,    // NEW: total duration in minutes
       patientId,
       patientPhone,
+      patientName,
       modality,
       priority,
-      orderDescription,
+      orderDescription,     // Legacy field for backward compatibility
+      procedureDescription, // Alternative field name
       queuedAt
     } = req.body;
 
@@ -99,13 +106,23 @@ router.post('/webhook', express.json(), validateWebhookAuth, async (req, res) =>
       queuedAt
     });
 
-    // Prepare order data for conversation
+    // Prepare order data for conversation with multi-procedure support
     const orderData = {
       orderId,
+      orderGroupId: orderGroupId || orderId,
+      orderSequence: orderSequence || 1,
+      totalInGroup: totalInGroup || 1,
+      procedures: procedures || [{
+        orderId,
+        description: orderDescription || procedureDescription || `${modality} exam`,
+        estimatedMinutes: 30
+      }],
+      estimatedDuration: estimatedDuration || 30,
       patientId,
+      patientName,
       modality,
       priority: priority || 'routine',
-      orderDescription: orderDescription || `${modality} exam`,
+      orderDescription: orderDescription || procedureDescription || `${modality} exam`,
       queuedAt: queuedAt || new Date().toISOString()
     };
 
