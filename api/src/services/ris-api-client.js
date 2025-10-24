@@ -196,7 +196,8 @@ async function getAvailableSlots(locationId, modality, startDate, endDate) {
 /**
  * Book an appointment in the RIS via QIE
  * @param {Object} bookingData - Appointment booking data
- * @param {string} bookingData.orderId - RIS order ID
+ * @param {string|string[]} bookingData.orderIds - Single order ID or array of order IDs for multi-procedure
+ * @param {string} bookingData.orderId - Legacy single order ID (deprecated, use orderIds)
  * @param {string} bookingData.patientId - Patient identifier
  * @param {string} bookingData.locationId - Location ID
  * @param {string} bookingData.modality - Imaging modality
@@ -212,26 +213,33 @@ async function bookAppointment(bookingData) {
 
   return retryWithBackoff(async () => {
     try {
+      // Support both single orderId and orderIds array
+      const orderIds = Array.isArray(bookingData.orderIds)
+        ? bookingData.orderIds
+        : [bookingData.orderId || bookingData.orderIds];
+
       logger.info('Booking appointment via Mock RIS', {
-        orderId: bookingData.orderId,
+        orderIds,
+        orderCount: orderIds.length,
         location: bookingData.locationId,
         modality: bookingData.modality,
         datetime: bookingData.appointmentTime
       });
 
-      // Mock RIS expects: orderId, patientPhone, patientName, modality, location, slotId, datetime
+      // Mock RIS expects: orderIds (array), patientPhone, patientName, modality, location, slotId, datetime
       const response = await qieClient.post('/book-appointment', {
-        orderId: bookingData.orderId,
+        orderIds,
         patientPhone: bookingData.phoneNumber,
-        patientName: bookingData.patientName || 'Patient',  // Optional
+        patientName: bookingData.patientName || 'Patient',
         modality: bookingData.modality.toLowerCase(),
-        location: bookingData.locationId,  // Mock RIS uses "location" not "locationId"
-        slotId: bookingData.slotId,  // Required by Mock RIS
+        location: bookingData.locationId,
+        slotId: bookingData.slotId,
         datetime: bookingData.appointmentTime
       });
 
       logger.info('Appointment booked successfully via Mock RIS', {
-        orderId: bookingData.orderId,
+        orderIds,
+        orderCount: orderIds.length,
         confirmationCode: response.data.appointment?.confirmationCode,
         appointmentId: response.data.appointment?.appointmentId
       });
@@ -240,11 +248,11 @@ async function bookAppointment(bookingData) {
       return {
         confirmationNumber: response.data.appointment?.confirmationCode,
         appointmentId: response.data.appointment?.appointmentId,
+        orderIds: response.data.appointment?.orderIds || orderIds,
         status: 'confirmed'
       };
     } catch (error) {
       logger.error('Failed to book appointment via QIE', {
-        orderId: bookingData.orderId,
         error: error.message,
         status: error.response?.status,
         errorData: error.response?.data

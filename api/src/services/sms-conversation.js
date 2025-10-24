@@ -400,72 +400,42 @@ async function handleTimeSelection(phoneNumber, conversation, message) {
   }
 
   try {
-    // Determine which orders need to be booked
-    // Include BOTH the primary order AND any pending orders
-    const ordersToBook = [];
+    // Collect ALL order IDs that need to be booked together
+    const orderIds = [];
 
     // Always include the primary order (the one that created the conversation)
-    ordersToBook.push({
-      orderId: orderData.orderId,
-      modality: orderData.modality,
-      patientId: orderData.patientId
-    });
+    orderIds.push(orderData.orderId);
 
     // Add any additional pending orders (from multi-procedure groups)
     if (orderData.pendingOrders && orderData.pendingOrders.length > 0) {
-      ordersToBook.push(...orderData.pendingOrders);
+      orderData.pendingOrders.forEach(order => {
+        orderIds.push(order.orderId);
+      });
     }
 
-    logger.info('Booking appointments for multiple orders', {
+    logger.info('Booking ONE appointment for multiple orders', {
       conversationId: conversation.id,
-      orderCount: ordersToBook.length,
-      orderIds: ordersToBook.map(o => o.orderId)
+      orderCount: orderIds.length,
+      orderIds
     });
 
-    // Book appointment for each order
-    const bookings = [];
-    for (let i = 0; i < ordersToBook.length; i++) {
-      const order = ordersToBook[i];
+    // Book ONE appointment for ALL orders
+    const booking = await risClient.bookAppointment({
+      orderIds,  // CHANGED: Pass array of all order IDs
+      patientId: orderData.patientId,
+      locationId: conversation.selected_location_id,
+      modality: orderData.modality,
+      slotId: selectedSlot.id,
+      appointmentTime: selectedSlot.startTime,
+      phoneNumber
+    });
 
-      try {
-        const booking = await risClient.bookAppointment({
-          orderId: order.orderId,
-          patientId: order.patientId || orderData.patientId,
-          locationId: conversation.selected_location_id,
-          modality: order.modality || orderData.modality,
-          slotId: selectedSlot.id,  // Same slot ID for all (they're all at the same time)
-          appointmentTime: selectedSlot.startTime,
-          phoneNumber,
-          groupReference: ordersToBook.length > 1 ? `GROUP-${conversation.id}` : null  // Link multi-procedure bookings
-        });
-
-        bookings.push({
-          orderId: order.orderId,
-          confirmationNumber: booking.confirmationNumber,
-          appointmentId: booking.appointmentId
-        });
-
-        logger.info('Appointment booked for order', {
-          orderId: order.orderId,
-          confirmationNumber: booking.confirmationNumber,
-          orderIndex: i + 1,
-          totalOrders: ordersToBook.length
-        });
-      } catch (error) {
-        // If individual booking fails, log but continue trying others
-        logger.error('Failed to book appointment for individual order', {
-          orderId: order.orderId,
-          error: error.message,
-          orderIndex: i + 1,
-          totalOrders: ordersToBook.length
-        });
-
-        // Only fail the entire process if NO bookings succeeded
-        if (bookings.length === 0 && i === ordersToBook.length - 1) {
-          throw error;  // Re-throw if this was the last order and nothing succeeded
-        }
-      }
-    }
+    logger.info('Single appointment booked for all orders', {
+      orderIds,
+      orderCount: orderIds.length,
+      confirmationNumber: booking.confirmationNumber,
+      appointmentId: booking.appointmentId
+    });
 
     // Update conversation
     await pool.query(
@@ -475,19 +445,15 @@ async function handleTimeSelection(phoneNumber, conversation, message) {
       [selectedSlot.startTime, STATES.CONFIRMED, conversation.id]
     );
 
-    // Send confirmation (list all confirmation numbers for multi-procedure orders)
+    // Send confirmation
     const confirmDate = new Date(selectedSlot.startTime);
-    let confirmMessage = `Appointment${ordersToBook.length > 1 ? 's' : ''} confirmed!\n\nDate: ${confirmDate.toLocaleDateString()}\nTime: ${confirmDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}\n`;
+    let confirmMessage = `Appointment${orderIds.length > 1 ? 's' : ''} confirmed!\n\nDate: ${confirmDate.toLocaleDateString()}\nTime: ${confirmDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}\n`;
 
-    if (ordersToBook.length > 1) {
-      confirmMessage += `\nProcedures (${ordersToBook.length}):\n`;
-      bookings.forEach((booking, index) => {
-        confirmMessage += `${index + 1}. Confirmation #: ${booking.confirmationNumber}\n`;
-      });
-    } else {
-      confirmMessage += `Confirmation #: ${bookings[0].confirmationNumber}\n`;
+    if (orderIds.length > 1) {
+      confirmMessage += `\n${orderIds.length} procedures booked together\n`;
     }
 
+    confirmMessage += `Confirmation #: ${booking.confirmationNumber}\n`;
     confirmMessage += `\nPlease arrive 15 minutes early.`;
 
     await sendSMS(phoneNumber, confirmMessage);
@@ -509,7 +475,12 @@ async function handleTimeSelection(phoneNumber, conversation, message) {
       sessionId: conversation.id.toString()
     });
 
-    return { success: true, action: 'APPOINTMENT_BOOKED', bookings, orderCount: ordersToBook.length };
+    return {
+      success: true,
+      action: 'APPOINTMENT_BOOKED',
+      booking,
+      orderCount: orderIds.length
+    };
   } catch (error) {
     logger.error('Failed to book appointment', {
       error: error.message,
