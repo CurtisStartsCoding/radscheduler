@@ -16,6 +16,7 @@ const appointmentRoutes = require('./routes/appointments');
 const patientSchedulingRoutes = require('./routes/patient-scheduling');
 const smsWebhookRoutes = require('./routes/sms-webhook');
 const orderWebhookRoutes = require('./routes/order-webhook');
+const hl7WebhookRoutes = require('./routes/hl7-webhooks');
 
 const app = express();
 const httpServer = createServer(app);
@@ -50,7 +51,8 @@ const limiter = rateLimit({
     // Webhooks have their own security (Bearer token, Twilio signature)
     return req.path === '/health' ||
            req.path === '/api/sms/webhook' ||
-           req.path === '/api/orders/webhook';
+           req.path === '/api/orders/webhook' ||
+           req.path.startsWith('/api/webhooks/hl7/');
   }
 });
 app.use('/api/', limiter);
@@ -84,6 +86,7 @@ app.use('/api/appointments', appointmentRoutes);
 app.use('/api/patient', patientSchedulingRoutes);
 app.use('/api/sms', smsWebhookRoutes);
 app.use('/api/orders', orderWebhookRoutes);
+app.use('/api/webhooks/hl7', hl7WebhookRoutes);
 
 // Error handling
 app.use((err, req, res, next) => {
