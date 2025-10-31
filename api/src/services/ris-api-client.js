@@ -230,7 +230,7 @@ async function bookAppointment(bookingData) {
         ? bookingData.orderIds
         : [bookingData.orderId || bookingData.orderIds];
 
-      logger.info('Booking appointment via HL7 Channel 8084', {
+      logger.info('Booking appointment via QIE Channel 8085', {
         orderIds,
         orderCount: orderIds.length,
         location: bookingData.locationId,
@@ -238,9 +238,9 @@ async function bookAppointment(bookingData) {
         datetime: bookingData.appointmentTime
       });
 
-      // QIE Channel 8084 expects JSON POST with booking request
+      // QIE Channel 8085 (Appointment Booking Requests) expects JSON POST
       // Similar to Channel 8082 (slot requests), this sends to QIE and
-      // confirmation will arrive via Channel 8085 webhook
+      // confirmation will arrive via Channel 8084 webhook
       const payload = {
         orderIds,
         patientMrn: bookingData.patientMrn || '',
@@ -252,8 +252,8 @@ async function bookAppointment(bookingData) {
         appointmentTime: bookingData.appointmentTime
       };
 
-      // POST to QIE Channel 8084 (booking requests)
-      const response = await axios.post('http://10.0.1.211:8084', payload, {
+      // POST to QIE Channel 8085 (booking requests)
+      const response = await axios.post('http://10.0.1.211:8085', payload, {
         headers: { 'Content-Type': 'application/json' },
         timeout: QIE_TIMEOUT_MS
       });
@@ -264,7 +264,7 @@ async function bookAppointment(bookingData) {
       });
 
       // NOTE: Booking confirmation will arrive asynchronously via webhook
-      // at /api/webhooks/hl7/appointment-notification (Channel 8085)
+      // at /api/webhooks/hl7/appointment-notification (Channel 8084)
       // Webhook handler will send SMS confirmation to patient
       // Return pending status for now
       return {
