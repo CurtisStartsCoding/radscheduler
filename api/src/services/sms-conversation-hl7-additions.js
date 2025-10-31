@@ -5,6 +5,9 @@
 
 const { getPool } = require('../db/connection');
 const logger = require('../utils/logger');
+const { decryptPhoneNumber } = require('../utils/phone-hash');
+const { sendSMS } = require('./notifications');
+const { logSMSInteraction, MESSAGE_TYPES, CONSENT_STATUS } = require('./sms-audit');
 
 // Import STATES from sms-conversation.js
 const { STATES } = require('./sms-conversation');
@@ -20,12 +23,14 @@ async function findConversationByMRN(mrn) {
 
   try {
     // Query conversations where order_data contains MRN in various possible fields
+    // Handle both base MRN (e.g., "FHRD7NZ4CVZZ7KR") and formatted MRN (e.g., "FHRD7NZ4CVZZ7KR^^^EMR^MR")
     const result = await pool.query(
       `SELECT * FROM sms_conversations
        WHERE (
          (order_data->>'patientId' = $1)
          OR (order_data->'patient'->>'mrn' = $1)
          OR (order_data->>'patientMrn' = $1)
+         OR (split_part(order_data->>'patientMrn', '^', 1) = $1)
        )
        AND state NOT IN ('EXPIRED', 'CANCELLED')
        AND expires_at > CURRENT_TIMESTAMP
@@ -145,8 +150,18 @@ async function sendSlotOptions(conversation, slots) {
   const pool = getPool();
 
   try {
+    // Decrypt phone number from conversation
+    const phoneNumber = decryptPhoneNumber(conversation.encrypted_phone);
+
+    if (!phoneNumber) {
+      logger.error('Failed to decrypt phone number', {
+        conversationId: conversation.id
+      });
+      throw new Error('Phone number not available');
+    }
+
     // Format slots for SMS display
-    let message = '📅 Available appointment times:\n\n';
+    let message = 'Available times:\n\n';
 
     slots.slice(0, 5).forEach((slot, index) => {
       const date = new Date(slot.dateTime);
@@ -164,7 +179,7 @@ async function sendSlotOptions(conversation, slots) {
       message += `${index + 1}. ${dateStr} at ${timeStr}\n`;
     });
 
-    message += `\nReply with the number of your preferred time.`;
+    message += `\nReply with the number (1-${Math.min(slots.length, 5)})`;
 
     // Update conversation state to CHOOSING_TIME
     await pool.query(
@@ -175,22 +190,21 @@ async function sendSlotOptions(conversation, slots) {
       [STATES.CHOOSING_TIME, conversation.id]
     );
 
-    logger.info('Formatted slot options for SMS', {
+    // Send SMS with available slots
+    await sendSMS(phoneNumber, message);
+
+    logger.info('Sent slot options via SMS', {
       conversationId: conversation.id,
-      slotsCount: slots.length,
-      message: message.substring(0, 100) + '...'
+      slotsCount: slots.length
     });
 
-    // TODO: Send SMS when we have access to plaintext phone number
-    // This is an architectural limitation - phone_hash can't be reversed
-    // Options:
-    // 1. Store encrypted phone in conversation
-    // 2. Pass phone through HL7 webhook (requires QIE channel update)
-    // 3. Enhance webhook payload to include phone
-
-    logger.warn('Cannot send SMS - phone number not available from phone_hash', {
-      conversationId: conversation.id,
-      phoneHash: conversation.phone_hash
+    // Log SMS interaction
+    await logSMSInteraction({
+      phoneNumber,
+      messageType: MESSAGE_TYPES.OUTBOUND_TIME_SLOTS,
+      messageDirection: 'OUTBOUND',
+      consentStatus: CONSENT_STATUS.CONSENTED,
+      sessionId: conversation.id.toString()
     });
 
   } catch (error) {

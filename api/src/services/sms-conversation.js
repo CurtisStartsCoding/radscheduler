@@ -1,6 +1,6 @@
 const { getPool } = require('../db/connection');
 const logger = require('../utils/logger');
-const { hashPhoneNumber } = require('../utils/phone-hash');
+const { hashPhoneNumber, encryptPhoneNumber } = require('../utils/phone-hash');
 const { sendSMS } = require('./notifications');
 const { hasConsent, recordConsent, revokeConsent } = require('./patient-consent');
 const { logSMSInteraction, MESSAGE_TYPES, CONSENT_STATUS } = require('./sms-audit');
@@ -38,6 +38,7 @@ async function startConversation(phoneNumber, orderData) {
 
   try {
     const phoneHash = hashPhoneNumber(phoneNumber);
+    const encryptedPhone = encryptPhoneNumber(phoneNumber);
     const expiresAt = new Date(Date.now() + SESSION_TTL_HOURS * 60 * 60 * 1000);
 
     // Check if patient has consent
@@ -46,11 +47,12 @@ async function startConversation(phoneNumber, orderData) {
     // Create conversation record
     const result = await pool.query(
       `INSERT INTO sms_conversations
-       (phone_hash, state, order_data, expires_at)
-       VALUES ($1, $2, $3, $4)
+       (phone_hash, encrypted_phone, state, order_data, expires_at)
+       VALUES ($1, $2, $3, $4, $5)
        RETURNING *`,
       [
         phoneHash,
+        encryptedPhone,
         consented ? STATES.CHOOSING_LOCATION : STATES.CONSENT_PENDING,
         JSON.stringify(orderData),
         expiresAt
@@ -171,11 +173,10 @@ async function sendLocationOptions(phoneNumber, conversation) {
 }
 
 /**
- * Send time slot selection options
+ * Send time slot selection options via HL7 flow through QIE
+ * Sends SRM request to QIE, which responds asynchronously via webhook
  */
 async function sendTimeSlotOptions(phoneNumber, conversation) {
-  const pool = getPool();
-
   try {
     const orderData = typeof conversation.order_data === 'string'
       ? JSON.parse(conversation.order_data)
@@ -185,42 +186,38 @@ async function sendTimeSlotOptions(phoneNumber, conversation) {
     const startDate = new Date();
     const endDate = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000); // Next 14 days
 
-    // Get available slots from RIS
-    const slots = await risClient.getAvailableSlots(locationId, orderData.modality, startDate, endDate);
-
-    if (slots.length === 0) {
-      await sendSMS(phoneNumber, 'Sorry, there are no available time slots. Please call us to schedule.');
-      await updateConversationState(conversation.id, STATES.CANCELLED);
-      return;
+    // Collect all order IDs for this conversation
+    const orderIds = [orderData.orderId];
+    if (orderData.pendingOrders && orderData.pendingOrders.length > 0) {
+      orderData.pendingOrders.forEach(order => orderIds.push(order.orderId));
     }
 
-    // Build time slot selection message
-    let message = `Available times:\n\n`;
-    slots.slice(0, 5).forEach((slot, index) => {
-      const date = new Date(slot.startTime);
-      message += `${index + 1}. ${date.toLocaleDateString()} at ${date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}\n`;
+    // Patient data from QIE Channel 6663 webhook (extracted from ORU PID segment)
+    const patientData = {
+      patientMrn: orderData.patientMrn,
+      patientName: orderData.patientName,
+      patientDob: orderData.patientDob,
+      patientGender: orderData.patientGender
+    };
+
+    // Send SRM request to QIE Channel 8082 (HL7 scheduling request)
+    // Response will come back asynchronously via webhook to /api/webhooks/hl7/schedule-response
+    // Note: getAvailableSlots() returns empty array - slots arrive via webhook
+    await risClient.getAvailableSlots(locationId, orderData.modality, startDate, endDate, patientData, orderIds);
+
+    // Send acknowledgment SMS (slots will be sent by webhook when SRR arrives)
+    await sendSMS(phoneNumber, 'Checking available times...');
+
+    logger.info('Schedule request sent to QIE via HL7', {
+      conversationId: conversation.id,
+      locationId,
+      modality: orderData.modality,
+      patientMrn: patientData.patientMrn,
+      orderIds
     });
-    message += `\nReply with the number (1-${Math.min(slots.length, 5)})`;
 
-    await sendSMS(phoneNumber, message);
-
-    // Store slots in conversation data
-    await pool.query(
-      `UPDATE sms_conversations
-       SET order_data = jsonb_set(order_data, '{availableSlots}', $1::jsonb)
-       WHERE id = $2`,
-      [JSON.stringify(slots.slice(0, 5)), conversation.id]
-    );
-
-    await logSMSInteraction({
-      phoneNumber,
-      messageType: MESSAGE_TYPES.OUTBOUND_TIME_SLOTS,
-      messageDirection: 'OUTBOUND',
-      consentStatus: CONSENT_STATUS.CONSENTED,
-      sessionId: conversation.id.toString()
-    });
   } catch (error) {
-    logger.error('Failed to send time slot options', {
+    logger.error('Failed to request time slots', {
       error: error.message,
       conversationId: conversation.id
     });

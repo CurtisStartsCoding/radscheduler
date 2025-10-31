@@ -110,7 +110,7 @@ async function getLocations(modality) {
     try {
       logger.info('Fetching available locations from QIE', { modality });
 
-      const response = await qieClient.get('/locations', {
+      const response = await axios.get('http://10.0.1.211:8086/locations', {
         params: { modality }
       });
 
@@ -140,7 +140,19 @@ async function getLocations(modality) {
  * @param {Date} endDate - End date for availability search
  * @returns {Promise<Array>} - List of available time slots
  */
-async function getAvailableSlots(locationId, modality, startDate, endDate) {
+
+
+/**
+ * Fetch available time slots for scheduling
+ * @param {string} locationId - Location identifier
+ * @param {string} modality - Imaging modality
+ * @param {Date} startDate - Start date for availability search
+ * @param {Date} endDate - End date for availability search
+ * @param {Object} patientData - Patient demographics from webhook
+ * @param {string[]} orderIds - Array of order IDs to schedule
+ * @returns {Promise<Array>} - List of available time slots
+ */
+async function getAvailableSlots(locationId, modality, startDate, endDate, patientData = {}, orderIds = []) {
   // Use mock data if RIS not configured
   if (USE_MOCK_RIS) {
     return getMockTimeSlots(locationId, modality, startDate, endDate);
@@ -148,43 +160,56 @@ async function getAvailableSlots(locationId, modality, startDate, endDate) {
 
   return retryWithBackoff(async () => {
     try {
-      // Mock RIS expects: location (not locationId), modality (lowercase), date (YYYY-MM-DD)
-      const dateStr = startDate.toISOString().split('T')[0]; // 2025-10-17
+      // Parse patient name if needed (format: "LastName^FirstName" or "First Last")
+      let firstName = patientData.firstName || '';
+      let lastName = patientData.lastName || '';
 
-      logger.info('Fetching available slots from Mock RIS', {
-        location: locationId,
-        modality: modality.toLowerCase(),
-        date: dateStr
-      });
-
-      const response = await qieClient.get('/available-slots', {
-        params: {
-          location: locationId,  // Mock RIS uses "location" not "locationId"
-          modality: modality.toLowerCase(),  // Mock RIS uses lowercase
-          date: dateStr  // Mock RIS uses single date, not start/end
+      if (!firstName && !lastName && patientData.patientName) {
+        const nameParts = patientData.patientName.split(/[\s^]+/);
+        if (nameParts.length >= 2) {
+          firstName = nameParts[0];
+          lastName = nameParts[nameParts.length - 1];
         }
-      });
+      }
 
-      logger.info('Slots retrieved from Mock RIS', {
-        locationId,
+      // QIE Channel 8082 expects JSON POST with schedule request
+      const payload = {
+        orderIds: orderIds,
+        patientMrn: patientData.patientMrn || patientData.mrn || '',
+        firstName: firstName,
+        lastName: lastName,
+        dateOfBirth: patientData.patientDob || patientData.dob || '',
+        gender: patientData.patientGender || patientData.gender || '',
+        requestedDate: startDate.toISOString().split('T')[0], // YYYY-MM-DD
+        modality: modality.toUpperCase(),
+        cptCodes: []
+      };
+
+      logger.info('Requesting slots from QIE', {
         modality,
-        slotCount: response.data.slots?.length || 0
+        requestedDate: payload.requestedDate,
+        orderIds: orderIds,
+        patientMrn: payload.patientMrn
       });
 
-      // Map Mock RIS response format to RadScheduler format
-      const slots = (response.data.slots || []).map(slot => ({
-        startTime: slot.datetime,  // Mock RIS uses "datetime", we need "startTime"
-        duration: slot.duration,
-        displayTime: slot.displayTime,
-        id: slot.id,
-        available: slot.available
-      }));
+      // POST directly to QIE port 8082 (no path)
+      const response = await axios.post('http://10.0.1.211:8082', payload, {
+        headers: { 'Content-Type': 'application/json' },
+        timeout: QIE_TIMEOUT_MS
+      });
 
-      return slots;
+      logger.info('Schedule request submitted to QIE', {
+        success: response.data.success,
+        messageControlId: response.data.messageControlId
+      });
+
+      // NOTE: Slots will arrive asynchronously via webhook
+      // at /api/webhooks/hl7/schedule-response
+      // For now, return empty array and rely on webhook flow
+      return [];
+
     } catch (error) {
-      logger.error('Failed to get available slots from QIE', {
-        locationId,
-        modality,
+      logger.error('Failed to request slots from QIE', {
         error: error.message,
         status: error.response?.status
       });
@@ -192,19 +217,6 @@ async function getAvailableSlots(locationId, modality, startDate, endDate) {
     }
   });
 }
-
-/**
- * Book an appointment in the RIS via QIE
- * @param {Object} bookingData - Appointment booking data
- * @param {string|string[]} bookingData.orderIds - Single order ID or array of order IDs for multi-procedure
- * @param {string} bookingData.orderId - Legacy single order ID (deprecated, use orderIds)
- * @param {string} bookingData.patientId - Patient identifier
- * @param {string} bookingData.locationId - Location ID
- * @param {string} bookingData.modality - Imaging modality
- * @param {string} bookingData.appointmentTime - ISO timestamp for appointment
- * @param {string} bookingData.phoneNumber - Patient phone number (for confirmation)
- * @returns {Promise<Object>} - Booking confirmation
- */
 async function bookAppointment(bookingData) {
   // Use mock data if RIS not configured
   if (USE_MOCK_RIS) {
@@ -218,7 +230,7 @@ async function bookAppointment(bookingData) {
         ? bookingData.orderIds
         : [bookingData.orderId || bookingData.orderIds];
 
-      logger.info('Booking appointment via Mock RIS', {
+      logger.info('Booking appointment via HL7 Channel 8084', {
         orderIds,
         orderCount: orderIds.length,
         location: bookingData.locationId,
@@ -226,33 +238,43 @@ async function bookAppointment(bookingData) {
         datetime: bookingData.appointmentTime
       });
 
-      // Mock RIS expects: orderIds (array), patientPhone, patientName, modality, location, slotId, datetime
-      const response = await qieClient.post('/book-appointment', {
+      // QIE Channel 8084 expects JSON POST with booking request
+      // Similar to Channel 8082 (slot requests), this sends to QIE and
+      // confirmation will arrive via Channel 8085 webhook
+      const payload = {
         orderIds,
+        patientMrn: bookingData.patientMrn || '',
         patientPhone: bookingData.phoneNumber,
         patientName: bookingData.patientName || 'Patient',
-        modality: bookingData.modality.toLowerCase(),
-        location: bookingData.locationId,
+        modality: bookingData.modality.toUpperCase(),
+        locationId: bookingData.locationId,
         slotId: bookingData.slotId,
-        datetime: bookingData.appointmentTime
+        appointmentTime: bookingData.appointmentTime
+      };
+
+      // POST to QIE Channel 8084 (booking requests)
+      const response = await axios.post('http://10.0.1.211:8084', payload, {
+        headers: { 'Content-Type': 'application/json' },
+        timeout: QIE_TIMEOUT_MS
       });
 
-      logger.info('Appointment booked successfully via Mock RIS', {
-        orderIds,
-        orderCount: orderIds.length,
-        confirmationCode: response.data.appointment?.confirmationCode,
-        appointmentId: response.data.appointment?.appointmentId
+      logger.info('Booking request submitted to QIE', {
+        success: response.data.success,
+        messageControlId: response.data.messageControlId
       });
 
-      // Return in expected format
+      // NOTE: Booking confirmation will arrive asynchronously via webhook
+      // at /api/webhooks/hl7/appointment-notification (Channel 8085)
+      // Webhook handler will send SMS confirmation to patient
+      // Return pending status for now
       return {
-        confirmationNumber: response.data.appointment?.confirmationCode,
-        appointmentId: response.data.appointment?.appointmentId,
-        orderIds: response.data.appointment?.orderIds || orderIds,
-        status: 'confirmed'
+        confirmationNumber: 'PENDING',
+        appointmentId: response.data.messageControlId,
+        orderIds,
+        status: 'pending'
       };
     } catch (error) {
-      logger.error('Failed to book appointment via QIE', {
+      logger.error('Failed to submit booking request to QIE', {
         error: error.message,
         status: error.response?.status,
         errorData: error.response?.data
