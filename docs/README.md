@@ -15,13 +15,15 @@ For project overview, quick start, and features, see the **[Main README](../READ
 ## 📚 Documentation
 
 ### Architecture & Planning
-- **[Architecture Hardening Plan](architecture-hardening-plan.md)** - Complete security and architecture hardening plan for Phase 5.2, including implementation details and Phase 5.2 vs old architecture comparison
-- **[Integration Architecture Plan](INTEGRATION-ARCHITECTURE-PLAN.md)** - QIE/Qvera integration layer design for data normalization, modality mapping, and vendor-agnostic RIS communication
-- **[Multi-Procedure Scheduling](MULTI-PROCEDURE-SCHEDULING.md)** - Architecture for handling grouped procedures (multiple imaging exams in one order) with duration-aware slot booking and SMS workflow
+- **[Architecture Hardening Plan](architecture/architecture-hardening-plan.md)** - Complete security and architecture hardening plan for Phase 5.2, including implementation details and Phase 5.2 vs old architecture comparison
+- **[Integration Architecture Plan](architecture/INTEGRATION-ARCHITECTURE-PLAN.md)** - QIE/Qvera integration layer design for data normalization, modality mapping, and vendor-agnostic RIS communication
+- **[Multi-Procedure Scheduling](architecture/MULTI-PROCEDURE-SCHEDULING.md)** - Architecture for handling grouped procedures (multiple imaging exams in one order) with duration-aware slot booking and SMS workflow
+- **[Smart Grouping Guide](architecture/SMART-GROUPING-GUIDE.md)** - Implementation guide for intelligent multi-procedure appointment stacking with configurable rules, evolution path, and optimization strategies
 
 ### Deployment & Operations
-- **[Deployment Guide](deployment-guide.md)** - Production deployment using bash script, EC2, PM2, and nginx reverse proxy. Includes troubleshooting and rollback procedures
-- **[Security Review](security-review.md)** - Current security status, completed hardening tasks, and infrastructure setup
+- **[Deployment Guide](deployment/deployment-guide.md)** - Production deployment using bash script, EC2, PM2, and nginx reverse proxy. Includes troubleshooting and rollback procedures
+- **[Security Review](deployment/security-review.md)** - Current security status, completed hardening tasks, and infrastructure setup
+- **[Quick Config Tweaks](operations/QUICK-TWEAKS.md)** - Cheat sheet for adjusting stacking rules and appointment durations in production
 
 ### Reports & Testing
 - **[Phase 4 Testing Progress](reports/phase-4-testing.md)** - Complete testing report with all features verified (SMS flow, consent, audit logging, webhooks)
