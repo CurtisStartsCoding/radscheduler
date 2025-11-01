@@ -206,7 +206,7 @@ async function sendTimeSlotOptions(phoneNumber, conversation) {
     await risClient.getAvailableSlots(locationId, orderData.modality, startDate, endDate, patientData, orderIds);
 
     // Send acknowledgment SMS (slots will be sent by webhook when SRR arrives)
-    await sendSMS(phoneNumber, 'Checking available times...');
+    // Removed confusing message - slots are sent automatically via webhook
 
     logger.info('Schedule request sent to QIE via HL7', {
       conversationId: conversation.id,
