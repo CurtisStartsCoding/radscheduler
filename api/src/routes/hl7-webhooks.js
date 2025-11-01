@@ -280,10 +280,10 @@ async function handleNewAppointment(conversation, appointment, patient) {
     hour12: true
   });
 
-  const message = `✅ Your appointment is confirmed!\n\n` +
+  const message = `✅ Your appointment is confirmed!\n` +
     `${appointment.serviceDescription}\n` +
     `${dateStr} at ${timeStr}\n` +
-    `Location: ${appointment.locationName}\n\n` +
+    `Location: ${appointment.locationName || appointment.locationId || 'To be confirmed'}\n\n` +
     `Confirmation #: ${appointment.fillerAppointmentId}\n\n` +
     `You'll receive a reminder 24 hours before your appointment.`;
 
@@ -304,7 +304,7 @@ async function handleRescheduledAppointment(conversation, appointment, patient) 
 
   const message = `📅 Your appointment has been rescheduled:\n\n` +
     `New time: ${dateStr} at ${timeStr}\n` +
-    `Location: ${appointment.locationName}\n` +
+    `Location: ${appointment.locationName || appointment.locationId || 'To be confirmed'}\n` +
     `Confirmation #: ${appointment.fillerAppointmentId}`;
 
   logger.warn('Cannot send SMS without plaintext phone number - need to modify architecture');
