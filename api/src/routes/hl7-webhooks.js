@@ -255,7 +255,17 @@ router.post('/appointment-notification', authenticateHL7Webhook, async (req, res
 
 async function handleNewAppointment(conversation, appointment, patient) {
   const { sendSMS } = require('../services/notifications');
-  const { getPhoneFromHash } = require('../utils/phone-hash');
+  const { decryptPhoneNumber } = require('../utils/phone-hash');
+
+  // Decrypt phone number from conversation
+  const phoneNumber = decryptPhoneNumber(conversation.encrypted_phone);
+
+  if (!phoneNumber) {
+    logger.error('Failed to decrypt phone number for appointment confirmation', {
+      conversationId: conversation.id
+    });
+    return null;
+  }
 
   const apptDate = new Date(appointment.dateTime);
   const dateStr = apptDate.toLocaleDateString('en-US', {
@@ -277,12 +287,13 @@ async function handleNewAppointment(conversation, appointment, patient) {
     `Confirmation #: ${appointment.fillerAppointmentId}\n\n` +
     `You'll receive a reminder 24 hours before your appointment.`;
 
-  // We need to get the phone number from the hash - but we can't reverse the hash
-  // The sendSMS function in notifications.js should accept phone_hash and look it up
-  // For now, we'll need to modify the architecture slightly
-  logger.warn('Cannot send SMS without plaintext phone number - need to modify architecture');
+  // Send the actual SMS
+  await sendSMS(phoneNumber, message);
+  logger.info('Appointment confirmation SMS sent', {
+    conversationId: conversation.id,
+    appointmentId: appointment.appointmentId
+  });
 
-  // TODO: Store encrypted phone number in conversation or pass through from webhook
   return message;
 }
 

@@ -389,7 +389,14 @@ async function handleTimeSelection(phoneNumber, conversation, message) {
     ? JSON.parse(conversation.order_data)
     : conversation.order_data;
 
-  const selectedSlot = orderData.availableSlots[selection - 1];
+
+  // Parse availableSlots if it's a string (double-serialized from JSONB)
+  let availableSlots = orderData.availableSlots;
+  if (typeof availableSlots === 'string') {
+    availableSlots = JSON.parse(availableSlots);
+  }
+
+  const selectedSlot = availableSlots[selection - 1];
 
   if (!selectedSlot) {
     await sendSMS(phoneNumber, 'Invalid selection. Please choose a number from the list.');
@@ -420,10 +427,11 @@ async function handleTimeSelection(phoneNumber, conversation, message) {
     const booking = await risClient.bookAppointment({
       orderIds,  // CHANGED: Pass array of all order IDs
       patientId: orderData.patientId,
+      patientMrn: orderData.patientMrn,  // Pass MRN from orderData
       locationId: conversation.selected_location_id,
       modality: orderData.modality,
-      slotId: selectedSlot.id,
-      appointmentTime: selectedSlot.startTime,
+      slotId: selectedSlot.resourceId || selectedSlot.id || selectedSlot.slotId,  // Try multiple field names
+      appointmentTime: selectedSlot.dateTime || selectedSlot.startTime,  // Slots have dateTime field
       phoneNumber
     });
 
@@ -442,18 +450,9 @@ async function handleTimeSelection(phoneNumber, conversation, message) {
       [selectedSlot.startTime, STATES.CONFIRMED, conversation.id]
     );
 
-    // Send confirmation
-    const confirmDate = new Date(selectedSlot.startTime);
-    let confirmMessage = `Appointment${orderIds.length > 1 ? 's' : ''} confirmed!\n\nDate: ${confirmDate.toLocaleDateString()}\nTime: ${confirmDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}\n`;
-
-    if (orderIds.length > 1) {
-      confirmMessage += `\n${orderIds.length} procedures booked together\n`;
-    }
-
-    confirmMessage += `Confirmation #: ${booking.confirmationNumber}\n`;
-    confirmMessage += `\nPlease arrive 15 minutes early.`;
-
-    await sendSMS(phoneNumber, confirmMessage);
+    // NOTE: Confirmation SMS is sent by the SIU webhook (hl7-webhooks.js)
+    // when Mock RIS sends the appointment notification message.
+    // This prevents duplicate SMS and ensures the real appointment data is shown.
 
     await logSMSInteraction({
       phoneNumber,
