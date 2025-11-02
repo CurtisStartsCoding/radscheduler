@@ -204,9 +204,9 @@ QIE acts as the **universal translator** between RadScheduler (modern REST APIs)
 **Your QIE administrator configures:**
 
 **Channel 1: Location Query**
-- **Source:** HTTP REST listener - `GET /api/ris/locations?modality={modality}`
-- **Destination:** Fuji Synapse HL7 query
-- **Transform:** REST query parameters → HL7 QRY → HL7 response → JSON
+- **Source:** HTTP POST listener on port 8082 - JSON payload `{"modality": "{modality}"}`
+- **Destination:** RIS system query (HL7 or REST depending on RIS)
+- **Transform:** JSON request → RIS query → JSON response with filtered locations
 - **Complexity:** Low (simple query/response pattern)
 
 **Channel 2: Slot Availability Query**
