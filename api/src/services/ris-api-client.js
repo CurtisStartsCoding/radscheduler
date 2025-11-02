@@ -110,8 +110,9 @@ async function getLocations(modality) {
     try {
       logger.info('Fetching available locations from QIE', { modality });
 
-      const response = await axios.get('http://10.0.1.211:8086/locations', {
-        params: { modality }
+      // Use Channel 8082 for location queries (same channel as schedule requests)
+      const response = await axios.post('http://10.0.1.211:8082', {
+        modality: modality
       });
 
       logger.info('Locations retrieved from QIE', {
@@ -182,7 +183,8 @@ async function getAvailableSlots(locationId, modality, startDate, endDate, patie
         gender: patientData.patientGender || patientData.gender || '',
         requestedDate: startDate.toISOString().split('T')[0], // YYYY-MM-DD
         modality: modality.toUpperCase(),
-        cptCodes: []
+        cptCodes: [],
+        locationId: locationId // Add location ID for filtering
       };
 
       logger.info('Requesting slots from QIE', {
