@@ -76,6 +76,9 @@ router.post('/webhook', express.json(), validateWebhookAuth, async (req, res) =>
       procedures,           // NEW: array of all procedures
       estimatedDuration,    // NEW: total duration in minutes
       patientId,
+      patientMrn,           // Patient MRN from HL7 PID-3
+      patientDob,           // Patient DOB from HL7 PID-7
+      patientGender,        // Patient gender from HL7 PID-8
       patientPhone,
       patientName,
       modality,
@@ -119,7 +122,10 @@ router.post('/webhook', express.json(), validateWebhookAuth, async (req, res) =>
       }],
       estimatedDuration: estimatedDuration || 30,
       patientId,
+      patientMrn: patientMrn || patientId,  // Use patientMrn if provided, fallback to patientId
       patientName,
+      patientDob,                            // Patient date of birth for SRM messages
+      patientGender,                         // Patient gender for SRM messages
       modality,
       priority: priority || 'routine',
       orderDescription: orderDescription || procedureDescription || `${modality} exam`,

@@ -281,7 +281,7 @@ async function handleNewAppointment(conversation, appointment, patient) {
   });
 
   const message = `✅ Your appointment is confirmed!\n` +
-    `${appointment.serviceDescription}\n` +
+    `\n` +
     `${dateStr} at ${timeStr}\n` +
     `Location: ${appointment.locationName || appointment.locationId || 'To be confirmed'}\n\n` +
     `Confirmation #: ${appointment.fillerAppointmentId}\n\n` +

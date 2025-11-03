@@ -125,19 +125,22 @@ async function sendLocationOptions(phoneNumber, conversation) {
     // Build location selection message with multi-procedure support
     let message = '';
 
+    // Get practice name from order data
+    const practiceName = orderData.orderingPractice || 'Your healthcare provider';
+
     if (orderData.procedures && orderData.procedures.length > 1) {
       // Multiple procedures - list them all
-      message = `Please select a location for your ${orderData.procedures.length} imaging exams:\n`;
+      message = `${practiceName} has ordered ${orderData.procedures.length} imaging exams for you:\n`;
       orderData.procedures.forEach(proc => {
         message += `• ${proc.description}\n`;
       });
-      message += `(Total time: ${orderData.estimatedDuration} minutes)\n\n`;
+      message += `(Total time: ${orderData.estimatedDuration} minutes)\n\nPlease select a convenient location:\n\n`;
     } else {
       // Single procedure
       const description = orderData.procedures?.[0]?.description ||
                          orderData.orderDescription ||
                          `${orderData.modality} exam`;
-      message = `Please select a location for your ${description}:\n\n`;
+      message = `${practiceName} has ordered a ${description} exam for you.\n\nPlease select a convenient location:\n\n`;
     }
 
     // Add location options
