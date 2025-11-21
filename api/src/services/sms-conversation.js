@@ -89,7 +89,14 @@ async function startConversation(phoneNumber, orderData) {
  * Send consent request SMS
  */
 async function sendConsentRequest(phoneNumber, conversation) {
-  const message = `Hello! You have a new imaging order. Would you like to schedule your appointment via text message? Reply YES to continue or STOP to opt out.`;
+  // Extract practice name from order data
+  const orderData = typeof conversation.order_data === 'string'
+    ? JSON.parse(conversation.order_data)
+    : conversation.order_data;
+
+  const practiceName = orderData.orderingPractice || 'Your healthcare provider';
+
+  const message = `Hello! ${practiceName} has a new imaging order for you. Would you like to schedule your appointment via text message? Reply YES to continue or STOP to opt out.`;
 
   await sendSMS(phoneNumber, message);
 

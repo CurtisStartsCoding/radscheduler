@@ -238,35 +238,86 @@ ssh -i temp/radorderpad-ssh-access.pem ubuntu@3.21.14.188 \
 2. **Time Selection**: "Available times:\n1. Mon Nov 3 at 8:00 AM..."
 3. **Confirmation**: "✅ Your appointment is confirmed!\nCT HEAD..."
 
-## Remaining Minor Issues (Non-Critical)
+## Recent Fixes
 
-### 1. Slot Availability
-**Issue**: Same time slot can be booked multiple times
-**Impact**: Testing inconvenience, not production-critical
-**Fix**: Update Mock RIS to mark slots as unavailable after booking
+### November 3, 2025 - Critical Production Issues
 
-### 2. Missing Location in Some Confirmations
-**Issue**: Location field occasionally empty in confirmation
-**Impact**: Minor UX issue
-**Fix**: Verify AIL-3.2 extraction in Channel 8084 mapping
+### 1. ~~Missing Patient Demographics~~ ✅ FIXED
+**Issue**: ~~Mock RIS rejected SRM messages with "Missing patient MRN (PID-3.1)" error~~
+**Root Cause**: RadScheduler order-webhook.js wasn't extracting patient demographics from QIE webhooks
+**Fix**: Updated order-webhook.js to extract patientMrn, patientDob, patientGender from webhook payload
+**Commit**: 537605a - "fix: Patient demographics and location data integration"
+**Result**: SRM messages now include complete PID segment with patient MRN, no more Mock RIS rejections
 
-### 3. ~~"Checking available times..." Message~~ ✅ FIXED
-**Issue**: ~~Confusing intermediate message~~
-**Impact**: ~~Minor UX issue~~
-**Fixed**: Removed unnecessary message entirely (Nov 1, 2025)
-### 3. ~~"Checking available times..." Message~~ ✅ FIXED
-**Issue**: ~~Confusing intermediate message~~
-**Impact**: ~~Minor UX issue~~
-**Fixed**: Removed unnecessary message entirely (Nov 1, 2025)
-### 3. ~~"Checking available times..." Message~~ ✅ FIXED
-**Issue**: ~~Confusing intermediate message~~
-**Impact**: ~~Minor UX issue~~
-**Fixed**: Removed unnecessary message entirely (Nov 1, 2025)
-### 3. ~~"Checking available times..." Message~~ ✅ FIXED
-**Issue**: ~~Confusing intermediate message~~
-**Impact**: ~~Minor UX issue~~
-**Fixed**: Removed unnecessary message entirely (Nov 1, 2025)
+### 2. ~~"Main Campus Imaging" Mock Data~~ ✅ FIXED
+**Issue**: ~~SMS showed hardcoded "Main Campus Imaging" instead of 14 real Radiology Regional locations~~
+**Root Cause**: USE_MOCK_RIS environment variable not set (defaulted to true), showing mock data
+**Fixes Applied**:
+- Set `USE_MOCK_RIS=false` in RadScheduler .env
+- Set `QIE_API_URL=http://10.0.1.211:8082`
+- Updated sms-conversation.js to use orderData.availableLocations from webhook first
+**Commit**: 537605a - "fix: Patient demographics and location data integration"
+**Result**: SMS now shows 14 real Radiology Regional locations from Mock RIS
 
+### 3. ~~RadScheduler Database Connection Failure~~ ✅ FIXED
+**Issue**: ~~RadScheduler couldn't start - "Missing required env var: DATABASE_URL"~~
+**Root Cause**: DATABASE_URL pointed to localhost:5433 (non-existent local PostgreSQL)
+**Fixes Applied**:
+- Updated DATABASE_URL to AWS RDS: `postgresql://...@radorderpad-main-db.../radorder_main`
+- Added explicit path to dotenv.config() in server.js
+- PM2 saved with correct configuration
+**Commit**: 537605a - "fix: Patient demographics and location data integration"
+**Result**: RadScheduler connects to correct database, runs successfully on port 3010
+
+### 4. ~~Undefined Service Description in Confirmation~~ ✅ FIXED
+**Issue**: ~~Confirmation SMS showed "undefined" for service description~~
+**Root Cause**: appointment.serviceDescription field not populated by Mock RIS
+**Fix**: Removed serviceDescription line from confirmation message template
+**Commit**: 11b46d2 - "fix: Remove undefined serviceDescription from SMS confirmation"
+**Result**: Clean confirmation message without undefined text
+
+### 5. ~~QIE Missing patientId Field~~ ✅ FIXED
+**Issue**: ~~RadScheduler expected both patientMrn and patientId fields for backward compatibility~~
+**Root Cause**: QIE Channel 6663 only sent patientMrn, not patientId
+**Fix**: Added patientId as duplicate of patientMrn in QIE mapping.js
+**Location**: radorderpad-api final-documentation/qvera/channel-scripts/channel-6663-.../mapping.js
+**Result**: RadScheduler receives patient identifier in both expected field names
+
+### Documentation Updates (November 3, 2025)
+- Created `docs/operations/TROUBLESHOOTING.md` - Comprehensive troubleshooting guide
+- Updated `docs/deployment/deployment-guide.md` - Complete .env template with critical warnings
+- Updated QIE roadmap v2.18 - Complete documentation of all 6 bugs and fixes
+
+### November 1, 2025 - SMS Flow Improvements
+
+### 7. ~~Duplicate SMS Messages~~ ✅ FIXED
+**Issue**: ~~Patient received two SMS - one correct, one with "Invalid Date"~~
+**Root Cause**: sms-conversation.js sent immediate confirmation before SIU webhook arrived
+**Fix**: Removed premature confirmation, only SIU webhook sends confirmation now
+**Result**: Single confirmation SMS with complete appointment details
+
+### 8. ~~Missing Location in Confirmations~~ ✅ FIXED
+**Issue**: ~~Location field empty or showing "To be confirmed" in confirmation SMS~~
+**Root Cause**: QIE Channel 8084 mapping wasn't extracting location name properly
+**Fix**: Updated Channel 8084 mapping configuration to properly extract and pass location name
+**Result**: Confirmation now shows actual location name (e.g., "Location: Radiology Regional - Main Campus")
+
+### 9. ~~"Checking available times..." Message~~ ✅ FIXED
+**Issue**: ~~Confusing intermediate message after patient selected time~~
+**Root Cause**: Unnecessary status message in booking flow
+**Fix**: Removed unnecessary message entirely
+**Commit**: 2df583e - "fix: Remove confusing 'Checking available times' message"
+**Result**: Cleaner UX, shows "Booking appointment..." instead
+
+## Remaining Enhancement (Non-Critical)
+
+### 1. Slot Availability Tracking
+**Issue**: Same time slot can be booked multiple times in Mock RIS
+**Impact**: Demo/QA inconvenience only - not production-critical (Mock RIS specific)
+**Root Cause**: bookAppointment() creates appointment but doesn't mark slot unavailable
+**Fix Needed**: Update Mock RIS to mark slots as unavailable after booking
+**Location**: mock-ris/src/mllp-listener.ts or mock-ris/src/services/scheduling-service.ts
+**Estimated Time**: 20-30 minutes
 ## Deployment Instructions
 
 ### Update RadScheduler

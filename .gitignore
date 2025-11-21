@@ -86,3 +86,4 @@ web/.env.local
 # Private keys
 *.pem
 *.key
+docs/deployment/deployment-guide.md
