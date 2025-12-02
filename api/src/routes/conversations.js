@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const logger = require('../utils/logger');
-const { authenticate, authorize } = require('../middleware/auth');
+// Auth handled by RadOrderPad (SuperAdmin access only)
 const conversationAdmin = require('../services/conversation-admin');
 
 /**
@@ -13,7 +13,7 @@ const conversationAdmin = require('../services/conversation-admin');
  * GET /api/conversations
  * List conversations with optional filters
  */
-router.get('/', authenticate, authorize(['read:conversations']), async (req, res) => {
+router.get('/', async (req, res) => {
   try {
     const { state, startDate, endDate, stuck, limit, offset } = req.query;
 
@@ -42,7 +42,7 @@ router.get('/', authenticate, authorize(['read:conversations']), async (req, res
  * GET /api/conversations/analytics/stats
  * Get conversation statistics
  */
-router.get('/analytics/stats', authenticate, authorize(['read:conversations']), async (req, res) => {
+router.get('/analytics/stats', async (req, res) => {
   try {
     const { startDate, endDate } = req.query;
 
@@ -65,7 +65,7 @@ router.get('/analytics/stats', authenticate, authorize(['read:conversations']), 
  * GET /api/conversations/analytics/state-duration
  * Get average time in each state
  */
-router.get('/analytics/state-duration', authenticate, authorize(['read:conversations']), async (req, res) => {
+router.get('/analytics/state-duration', async (req, res) => {
   try {
     const { startDate, endDate } = req.query;
 
@@ -88,7 +88,7 @@ router.get('/analytics/state-duration', authenticate, authorize(['read:conversat
  * GET /api/conversations/analytics/timeseries
  * Get conversation counts over time for charting
  */
-router.get('/analytics/timeseries', authenticate, authorize(['read:conversations']), async (req, res) => {
+router.get('/analytics/timeseries', async (req, res) => {
   try {
     const { startDate, endDate, interval } = req.query;
 
@@ -119,7 +119,7 @@ router.get('/analytics/timeseries', authenticate, authorize(['read:conversations
  * GET /api/conversations/analytics/sms-volume
  * Get SMS send/receive counts
  */
-router.get('/analytics/sms-volume', authenticate, authorize(['read:conversations']), async (req, res) => {
+router.get('/analytics/sms-volume', async (req, res) => {
   try {
     const { startDate, endDate } = req.query;
 
@@ -149,7 +149,7 @@ router.get('/analytics/sms-volume', authenticate, authorize(['read:conversations
  * GET /api/conversations/:id
  * Get a single conversation
  */
-router.get('/:id', authenticate, authorize(['read:conversations']), async (req, res) => {
+router.get('/:id', async (req, res) => {
   try {
     const conversation = await conversationAdmin.getConversationById(req.params.id);
 
@@ -174,11 +174,11 @@ router.get('/:id', authenticate, authorize(['read:conversations']), async (req, 
  * DELETE /api/conversations/:id
  * Delete a conversation (ADMIN only)
  */
-router.delete('/:id', authenticate, authorize(['delete:conversations']), async (req, res) => {
+router.delete('/:id', async (req, res) => {
   try {
     const result = await conversationAdmin.deleteConversation(
       req.params.id,
-      req.user.id
+      'radorderpad-admin'
     );
 
     if (!result.success) {
@@ -196,7 +196,7 @@ router.delete('/:id', authenticate, authorize(['delete:conversations']), async (
  * PATCH /api/conversations/:id/state
  * Force state transition (ADMIN only)
  */
-router.patch('/:id/state', authenticate, authorize(['write:conversations']), async (req, res) => {
+router.patch('/:id/state', async (req, res) => {
   try {
     const { newState, reason } = req.body;
 
@@ -208,7 +208,7 @@ router.patch('/:id/state', authenticate, authorize(['write:conversations']), asy
     }
 
     // Only allow ADMIN to force state changes
-    if (req.user.role !== 'admin') {
+    if (false) {
       return res.status(403).json({
         success: false,
         error: 'Only administrators can force state transitions'
@@ -218,7 +218,7 @@ router.patch('/:id/state', authenticate, authorize(['write:conversations']), asy
     const result = await conversationAdmin.forceStateTransition(
       req.params.id,
       newState,
-      req.user.id,
+      'radorderpad-admin',
       reason
     );
 
@@ -237,7 +237,7 @@ router.patch('/:id/state', authenticate, authorize(['write:conversations']), asy
  * POST /api/conversations/:id/retry
  * Retry a step (location or timeslots)
  */
-router.post('/:id/retry', authenticate, authorize(['write:conversations']), async (req, res) => {
+router.post('/:id/retry', async (req, res) => {
   try {
     const { step } = req.body;
 
@@ -251,7 +251,7 @@ router.post('/:id/retry', authenticate, authorize(['write:conversations']), asyn
     const result = await conversationAdmin.retryStep(
       req.params.id,
       step,
-      req.user.id
+      'radorderpad-admin'
     );
 
     if (!result.success) {
@@ -269,7 +269,7 @@ router.post('/:id/retry', authenticate, authorize(['write:conversations']), asyn
  * POST /api/conversations/:id/send-sms
  * Send manual SMS (ADMIN only)
  */
-router.post('/:id/send-sms', authenticate, authorize(['write:conversations']), async (req, res) => {
+router.post('/:id/send-sms', async (req, res) => {
   try {
     const { message } = req.body;
 
@@ -281,7 +281,7 @@ router.post('/:id/send-sms', authenticate, authorize(['write:conversations']), a
     }
 
     // Only allow ADMIN to send manual SMS
-    if (req.user.role !== 'admin') {
+    if (false) {
       return res.status(403).json({
         success: false,
         error: 'Only administrators can send manual SMS'
@@ -291,7 +291,7 @@ router.post('/:id/send-sms', authenticate, authorize(['write:conversations']), a
     const result = await conversationAdmin.sendManualSMS(
       req.params.id,
       message,
-      req.user.id
+      'radorderpad-admin'
     );
 
     if (!result.success) {
@@ -309,13 +309,13 @@ router.post('/:id/send-sms', authenticate, authorize(['write:conversations']), a
  * DELETE /api/conversations/bulk/expired
  * Bulk delete expired conversations (ADMIN only)
  */
-router.delete('/bulk/expired', authenticate, authorize(['delete:conversations']), async (req, res) => {
+router.delete('/bulk/expired', async (req, res) => {
   try {
     const { olderThanDays } = req.query;
 
     const result = await conversationAdmin.bulkDeleteExpired(
       olderThanDays ? parseInt(olderThanDays) : 7,
-      req.user.id
+      'radorderpad-admin'
     );
 
     res.json(result);
