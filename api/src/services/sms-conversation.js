@@ -147,7 +147,8 @@ async function sendLocationOptions(phoneNumber, conversation) {
       const description = orderData.procedures?.[0]?.description ||
                          orderData.orderDescription ||
                          `${orderData.modality} exam`;
-      message = `${practiceName} has ordered a ${description} exam for you.\n\nPlease select a convenient location:\n\n`;
+      const duration = orderData.procedures?.[0]?.estimatedMinutes || orderData.estimatedDuration || 30;
+      message = `${practiceName} has ordered a ${description} exam for you.\n(Estimated time: ${duration} minutes)\n\nPlease select a convenient location:\n\n`;
     }
 
     // Add location options
