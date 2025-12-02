@@ -9,6 +9,7 @@ require('dotenv').config();
 const { connectDB } = require('./db/connection');
 const logger = require('./utils/logger');
 const { startCleanupJob } = require('./services/session-cleanup');
+const { startStuckMonitorJob, stopStuckMonitorJob } = require('./services/stuck-conversation-monitor');
 
 // Route imports
 const authRoutes = require('./routes/auth');
@@ -17,6 +18,7 @@ const patientSchedulingRoutes = require('./routes/patient-scheduling');
 const smsWebhookRoutes = require('./routes/sms-webhook');
 const orderWebhookRoutes = require('./routes/order-webhook');
 const hl7WebhookRoutes = require('./routes/hl7-webhooks');
+const conversationRoutes = require('./routes/conversations');
 
 const app = express();
 const httpServer = createServer(app);
@@ -87,6 +89,7 @@ app.use('/api/patient', patientSchedulingRoutes);
 app.use('/api/sms', smsWebhookRoutes);
 app.use('/api/orders', orderWebhookRoutes);
 app.use('/api/webhooks/hl7', hl7WebhookRoutes);
+app.use('/api/conversations', conversationRoutes);
 
 // Error handling
 app.use((err, req, res, next) => {
@@ -99,6 +102,7 @@ app.use((err, req, res, next) => {
 
 // Initialize services
 let cleanupJobId = null;
+let stuckMonitorJobId = null;
 
 async function startServer() {
   try {
@@ -108,12 +112,16 @@ async function startServer() {
     // Start session cleanup job
     cleanupJobId = startCleanupJob();
 
+    // Start stuck conversation monitor job
+    stuckMonitorJobId = startStuckMonitorJob();
+
     // Start server
     const PORT = process.env.PORT || 3001;
     httpServer.listen(PORT, () => {
       logger.info(`RadScheduler API running on port ${PORT}`);
       logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
       logger.info(`SMS scheduling system active`);
+      logger.info(`Stuck conversation monitor active (5-min timeout, 1 retry)`);
     });
     
     // Graceful shutdown
@@ -133,6 +141,11 @@ async function shutdown() {
   if (cleanupJobId) {
     const { stopCleanupJob } = require('./services/session-cleanup');
     stopCleanupJob(cleanupJobId);
+  }
+
+  // Stop stuck monitor job
+  if (stuckMonitorJobId) {
+    stopStuckMonitorJob(stuckMonitorJobId);
   }
 
   httpServer.close(() => {

@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const crypto = require('crypto');
 const logger = require('../utils/logger');
-const { startConversation, getActiveConversationByPhone, addOrderToConversation } = require('../services/sms-conversation');
+const { startConversation, getActiveConversationByPhone, addOrderToConversation, resendConsentWithMultipleOrders } = require('../services/sms-conversation');
 const { hashPhoneNumber } = require('../utils/phone-hash');
 
 /**
@@ -141,30 +141,38 @@ router.post('/webhook', express.json(), validateWebhookAuth, async (req, res) =>
     let conversation;
     let wasQueued = false;
 
-    // Only queue to conversations where patient has engaged (not stuck in CONSENT_PENDING)
-    // This prevents silently adding orders to conversations the patient is ignoring
-    if (existingConversation && existingConversation.state !== 'CONSENT_PENDING') {
-      // Patient is actively engaging, add order to queue (prevents duplicate SMS)
+    // Always queue orders to existing conversations (including CONSENT_PENDING)
+    // This prevents orphaned conversations when multiple orders arrive before patient responds
+    if (existingConversation) {
+      // Add order to existing conversation queue
       await addOrderToConversation(existingConversation.id, orderData);
       conversation = existingConversation;
       wasQueued = true;
 
-      logger.info('Order added to active SMS conversation', {
+      logger.info('Order added to existing SMS conversation', {
         orderId,
         conversationId: existingConversation.id,
         state: existingConversation.state,
         patientHash: hashPhoneNumber(patientPhone)
       });
+
+      // If patient hasn't consented yet, resend consent SMS with updated order count
+      if (existingConversation.state === 'CONSENT_PENDING') {
+        await resendConsentWithMultipleOrders(existingConversation);
+        logger.info('Resent consent request with updated order count', {
+          orderId,
+          conversationId: existingConversation.id,
+          patientHash: hashPhoneNumber(patientPhone)
+        });
+      }
     } else {
-      // Start new SMS conversation flow
-      // This happens when: (1) no active conversation OR (2) patient hasn't responded to consent yet
+      // No active conversation - start new SMS conversation flow
       conversation = await startConversation(patientPhone, orderData);
 
       logger.info('New SMS scheduling conversation initiated from order webhook', {
         orderId,
         conversationId: conversation.id,
         state: conversation.state,
-        reason: existingConversation ? 'patient_not_engaged' : 'no_active_conversation',
         patientHash: hashPhoneNumber(patientPhone)
       });
     }

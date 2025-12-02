@@ -18,7 +18,7 @@ const PERMISSIONS = {
   [ROLES.ADMIN]: ['*'], // All permissions
   [ROLES.RADIOLOGIST]: ['read:appointments', 'write:appointments', 'read:analytics', 'read:clinical'],
   [ROLES.TECHNOLOGIST]: ['read:appointments', 'write:appointments', 'read:analytics'],
-  [ROLES.SCHEDULER]: ['read:appointments', 'write:appointments', 'read:analytics', 'write:clinical'],
+  [ROLES.SCHEDULER]: ['read:appointments', 'write:appointments', 'read:analytics', 'write:clinical', 'read:conversations', 'write:conversations'],
   [ROLES.VIEWER]: ['read:appointments', 'read:analytics']
 };
 

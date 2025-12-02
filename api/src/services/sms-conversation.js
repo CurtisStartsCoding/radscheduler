@@ -1,6 +1,6 @@
 const { getPool } = require('../db/connection');
 const logger = require('../utils/logger');
-const { hashPhoneNumber, encryptPhoneNumber } = require('../utils/phone-hash');
+const { hashPhoneNumber, encryptPhoneNumber, decryptPhoneNumber } = require('../utils/phone-hash');
 const { sendSMS } = require('./notifications');
 const { hasConsent, recordConsent, revokeConsent } = require('./patient-consent');
 const { logSMSInteraction, MESSAGE_TYPES, CONSENT_STATUS } = require('./sms-audit');
@@ -358,10 +358,14 @@ async function handleLocationSelection(phoneNumber, conversation, message) {
     return { success: false, error: 'LOCATION_NOT_FOUND' };
   }
 
-  // Update conversation with selected location
+  // Update conversation with selected location and start tracking slot request
   await pool.query(
     `UPDATE sms_conversations
-     SET selected_location_id = $1, state = $2, updated_at = CURRENT_TIMESTAMP
+     SET selected_location_id = $1,
+         state = $2,
+         slot_request_sent_at = CURRENT_TIMESTAMP,
+         slot_retry_count = 0,
+         updated_at = CURRENT_TIMESTAMP
      WHERE id = $3`,
     [selectedLocation.id, STATES.CHOOSING_TIME, conversation.id]
   );
@@ -595,11 +599,72 @@ async function getActiveConversationByPhone(phoneNumber) {
   return await getActiveConversation(phoneHash);
 }
 
+/**
+ * Resend consent request when additional orders arrive before patient responds
+ * Updates the message to reflect multiple pending orders
+ */
+async function resendConsentWithMultipleOrders(conversation) {
+  try {
+    // Decrypt phone number from conversation
+    const phoneNumber = decryptPhoneNumber(conversation.encrypted_phone);
+
+    if (!phoneNumber) {
+      logger.error('Cannot resend consent - phone decryption failed', {
+        conversationId: conversation.id
+      });
+      return;
+    }
+
+    // Parse order data to get order count
+    const orderData = typeof conversation.order_data === 'string'
+      ? JSON.parse(conversation.order_data)
+      : conversation.order_data;
+
+    // Count total orders (primary + pending)
+    const pendingCount = orderData.pendingOrders?.length || 0;
+    const totalOrders = 1 + pendingCount;
+
+    const practiceName = orderData.orderingPractice || 'Your healthcare provider';
+
+    // Construct message with order count
+    const orderText = totalOrders === 1
+      ? 'a new imaging order'
+      : `${totalOrders} imaging orders`;
+
+    const message = `Hello! ${practiceName} has ${orderText} for you. Would you like to schedule your appointment${totalOrders > 1 ? 's' : ''} via text message? Reply YES to continue or STOP to opt out.`;
+
+    await sendSMS(phoneNumber, message);
+
+    await logSMSInteraction({
+      phoneNumber,
+      messageType: MESSAGE_TYPES.OUTBOUND_CONSENT,
+      messageDirection: 'OUTBOUND',
+      consentStatus: CONSENT_STATUS.PENDING,
+      sessionId: conversation.id.toString()
+    });
+
+    logger.info('Resent consent request with multiple orders', {
+      conversationId: conversation.id,
+      totalOrders,
+      phoneHash: hashPhoneNumber(phoneNumber)
+    });
+  } catch (error) {
+    logger.error('Failed to resend consent with multiple orders', {
+      error: error.message,
+      conversationId: conversation.id
+    });
+    throw error;
+  }
+}
+
 module.exports = {
   startConversation,
   handleInboundMessage,
   getActiveConversation,
   getActiveConversationByPhone,
   addOrderToConversation,
+  resendConsentWithMultipleOrders,
+  sendLocationOptions,
+  sendTimeSlotOptions,
   STATES
 };

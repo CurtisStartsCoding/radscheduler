@@ -1,6 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const logger = require('../utils/logger');
+const { getPool } = require('../db/connection');
+const { decryptPhoneNumber } = require('../utils/phone-hash');
+const { sendSMS } = require('../services/notifications');
 // TODO: Merge sms-conversation-hl7-additions.js into sms-conversation.js
 // For now, importing from additions file
 const {
@@ -9,7 +12,8 @@ const {
   updateAppointmentStatus,
   sendSlotOptions
 } = require('../services/sms-conversation-hl7-additions');
-const { logSMSInteraction, MESSAGE_TYPES } = require('../services/sms-audit');
+const { sendLocationOptions, STATES } = require('../services/sms-conversation');
+const { logSMSInteraction, MESSAGE_TYPES, CONSENT_STATUS } = require('../services/sms-audit');
 
 /**
  * HL7 Webhook Handler for Scheduling Messages
@@ -74,12 +78,69 @@ router.post('/schedule-response', authenticateHL7Webhook, async (req, res) => {
 
     if (!success) {
       logger.warn(`Schedule request failed for MRN ${patient.mrn}`, {
-        messageControlId
+        messageControlId,
+        errorDetails: req.body.errorMessage || 'Unknown error'
       });
-      // TODO: Handle failure - maybe retry or notify patient
+
+      // Find conversation and notify patient of failure
+      const failedConversation = await findConversationByMRN(patient.mrn);
+      if (failedConversation) {
+        const phoneNumber = decryptPhoneNumber(failedConversation.encrypted_phone);
+        if (phoneNumber) {
+          const pool = getPool();
+
+          // Check retry count - if not exhausted, queue for retry via monitor
+          if ((failedConversation.slot_retry_count || 0) < 1) {
+            // Queue for automatic retry by incrementing retry count
+            await pool.query(
+              `UPDATE sms_conversations
+               SET slot_retry_count = COALESCE(slot_retry_count, 0) + 1,
+                   slot_request_sent_at = CURRENT_TIMESTAMP,
+                   updated_at = CURRENT_TIMESTAMP
+               WHERE id = $1`,
+              [failedConversation.id]
+            );
+            logger.info('Queued failed slot request for retry', {
+              conversationId: failedConversation.id,
+              mrn: patient.mrn
+            });
+          } else {
+            // Max retries exceeded - notify patient to call
+            const message = `We're sorry, but we encountered an error while searching for appointment times. Please call us to complete your scheduling.`;
+            await sendSMS(phoneNumber, message);
+
+            await pool.query(
+              `UPDATE sms_conversations
+               SET state = $1,
+                   slot_request_failed_at = CURRENT_TIMESTAMP,
+                   slot_request_sent_at = NULL,
+                   completed_at = CURRENT_TIMESTAMP,
+                   updated_at = CURRENT_TIMESTAMP
+               WHERE id = $2`,
+              [STATES.CANCELLED, failedConversation.id]
+            );
+
+            await logSMSInteraction({
+              phoneNumber,
+              messageType: MESSAGE_TYPES.OUTBOUND_ERROR,
+              messageDirection: 'OUTBOUND',
+              consentStatus: CONSENT_STATUS.CONSENTED,
+              sessionId: failedConversation.id.toString(),
+              success: false,
+              errorMessage: `Schedule request failed: ${req.body.errorMessage || 'Unknown'}`
+            });
+
+            logger.info('Patient notified of scheduling failure', {
+              conversationId: failedConversation.id,
+              mrn: patient.mrn
+            });
+          }
+        }
+      }
+
       return res.status(200).json({
         success: true,
-        message: 'Failure acknowledged'
+        message: 'Failure handled - patient will be notified or retry queued'
       });
     }
 
@@ -89,10 +150,50 @@ router.post('/schedule-response', authenticateHL7Webhook, async (req, res) => {
         messageControlId,
         mrn: patient.mrn
       });
-      // TODO: Notify patient that no slots are available
+
+      // Find conversation and notify patient that no slots are available
+      const noSlotsConversation = await findConversationByMRN(patient.mrn);
+      if (noSlotsConversation) {
+        const phoneNumber = decryptPhoneNumber(noSlotsConversation.encrypted_phone);
+        if (phoneNumber) {
+          const pool = getPool();
+
+          // Send SMS asking patient to try another location or call
+          const message = `We're sorry, but there are no available appointment times at your selected location in the next 2 weeks. Please reply with a different location number, or call us to find alternative options.`;
+          await sendSMS(phoneNumber, message);
+
+          // Return patient to CHOOSING_LOCATION state so they can try again
+          await pool.query(
+            `UPDATE sms_conversations
+             SET state = $1,
+                 slot_request_sent_at = NULL,
+                 updated_at = CURRENT_TIMESTAMP
+             WHERE id = $2`,
+            [STATES.CHOOSING_LOCATION, noSlotsConversation.id]
+          );
+
+          // Re-send location options
+          await sendLocationOptions(phoneNumber, noSlotsConversation);
+
+          await logSMSInteraction({
+            phoneNumber,
+            messageType: MESSAGE_TYPES.OUTBOUND_ERROR,
+            messageDirection: 'OUTBOUND',
+            consentStatus: CONSENT_STATUS.CONSENTED,
+            sessionId: noSlotsConversation.id.toString(),
+            errorMessage: 'No slots available at selected location'
+          });
+
+          logger.info('Patient notified of no available slots, returned to location selection', {
+            conversationId: noSlotsConversation.id,
+            mrn: patient.mrn
+          });
+        }
+      }
+
       return res.status(200).json({
         success: true,
-        message: 'No slots available - patient will be notified'
+        message: 'No slots available - patient notified and returned to location selection'
       });
     }
 
@@ -114,6 +215,16 @@ router.post('/schedule-response', authenticateHL7Webhook, async (req, res) => {
 
     // Store slots in conversation state
     await storeAvailableSlots(conversation.id, availableSlots);
+
+    // Clear webhook tracking - request completed successfully
+    const pool = getPool();
+    await pool.query(
+      `UPDATE sms_conversations
+       SET slot_request_sent_at = NULL,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1`,
+      [conversation.id]
+    );
 
     // Send SMS to patient with available slots
     await sendSlotOptions(conversation, availableSlots);

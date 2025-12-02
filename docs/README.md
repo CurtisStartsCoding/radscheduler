@@ -1,7 +1,7 @@
 # RadScheduler Documentation Index
 
 **Version:** Phase 5.2
-**Last Updated:** October 15, 2025
+**Last Updated:** December 2, 2025
 **Architecture:** SMS Self-Scheduling with QIE Middleware Integration
 
 ---
@@ -29,6 +29,9 @@ For project overview, quick start, and features, see the **[Main README](../READ
 - **[Phase 4 Testing Progress](reports/phase-4-testing.md)** - Complete testing report with all features verified (SMS flow, consent, audit logging, webhooks)
 - **[Reverse Proxy Test Results](reports/reverse-proxy-tests.md)** - Infrastructure testing and nginx reverse proxy verification
 - **[Dependency Audit (2025-10-15)](audits/2025-10-15-dependency-audit.md)** - Dependency cleanup report, security audit results, and production readiness assessment
+
+### Error Handling & Admin Dashboard
+- **[Error Handling & Dashboard (2025-12-02)](2025-12-02-error-handling-dashboard.md)** - Comprehensive error handling implementation: empty slots notification, stuck conversation monitor (5-min timeout with auto-retry), multiple order bug fix, and admin dashboard API with analytics
 
 ### AI Assessment Roles
 - **[Senior SWE Role](roles/senior_swe_role.md)** - Senior software engineer assessment role
