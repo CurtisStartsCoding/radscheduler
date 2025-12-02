@@ -36,6 +36,7 @@ async function getConversations(filters = {}) {
         slot_request_sent_at,
         slot_retry_count,
         slot_request_failed_at,
+        order_data,
         order_data->>'orderId' as order_id,
         order_data->>'modality' as modality,
         order_data->>'orderingPractice' as ordering_practice,
