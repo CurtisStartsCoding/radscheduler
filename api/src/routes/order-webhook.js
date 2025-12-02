@@ -85,7 +85,8 @@ router.post('/webhook', express.json(), validateWebhookAuth, async (req, res) =>
       priority,
       orderDescription,     // Legacy field for backward compatibility
       procedureDescription, // Alternative field name
-      queuedAt
+      queuedAt,
+      orderingPractice      // Practice name from HL7 MSH-3 (Sending Facility)
     } = req.body;
 
     // Validate required fields
@@ -106,7 +107,8 @@ router.post('/webhook', express.json(), validateWebhookAuth, async (req, res) =>
       patientHash: hashPhoneNumber(patientPhone),
       modality,
       priority,
-      queuedAt
+      queuedAt,
+      orderingPractice      // Practice name from HL7 MSH-3 (Sending Facility)
     });
 
     // Prepare order data for conversation with multi-procedure support
@@ -129,7 +131,8 @@ router.post('/webhook', express.json(), validateWebhookAuth, async (req, res) =>
       modality,
       priority: priority || 'routine',
       orderDescription: orderDescription || procedureDescription || `${modality} exam`,
-      queuedAt: queuedAt || new Date().toISOString()
+      queuedAt: queuedAt || new Date().toISOString(),
+      orderingPractice       // Practice name for SMS messages
     };
 
     // Check if patient already has an active conversation
