@@ -158,7 +158,9 @@ router.post('/webhook', express.json(), validateWebhookAuth, async (req, res) =>
 
       // If patient hasn't consented yet, resend consent SMS with updated order count
       if (existingConversation.state === 'CONSENT_PENDING') {
-        await resendConsentWithMultipleOrders(existingConversation);
+        // Re-fetch conversation to get updated order_data with new pending order
+        const updatedConversation = await getActiveConversationByPhone(patientPhone);
+        await resendConsentWithMultipleOrders(updatedConversation);
         logger.info('Resent consent request with updated order count', {
           orderId,
           conversationId: existingConversation.id,

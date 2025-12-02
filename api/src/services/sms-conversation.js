@@ -96,7 +96,7 @@ async function sendConsentRequest(phoneNumber, conversation) {
 
   const practiceName = orderData.orderingPractice || 'Your healthcare provider';
 
-  const message = `Hello! ${practiceName} has a new imaging order for you. Would you like to schedule your appointment via text message? Reply YES to continue or STOP to opt out.`;
+  const message = `${practiceName} has a new imaging order for you. Would you like to schedule your appointment via text message? Reply YES to continue or STOP to opt out.`;
 
   await sendSMS(phoneNumber, message);
 
@@ -440,7 +440,7 @@ async function handleTimeSelection(phoneNumber, conversation, message) {
 
     // Book ONE appointment for ALL orders
     const booking = await risClient.bookAppointment({
-      orderIds,  // CHANGED: Pass array of all order IDs
+      orderIds,  // Pass array of all order IDs
       patientId: orderData.patientId,
       patientMrn: orderData.patientMrn,  // Pass MRN from orderData
       locationId: conversation.selected_location_id,
@@ -631,7 +631,7 @@ async function resendConsentWithMultipleOrders(conversation) {
       ? 'a new imaging order'
       : `${totalOrders} imaging orders`;
 
-    const message = `Hello! ${practiceName} has ${orderText} for you. Would you like to schedule your appointment${totalOrders > 1 ? 's' : ''} via text message? Reply YES to continue or STOP to opt out.`;
+    const message = `${practiceName} has ${orderText} for you. Would you like to schedule your appointment${totalOrders > 1 ? 's' : ''} via text message? Reply YES to continue or STOP to opt out.`;
 
     await sendSMS(phoneNumber, message);
 

@@ -55,11 +55,44 @@ APP_NAME="radscheduler"
 The server expects:
 - PM2 service named `radscheduler-api`
 - `.env` file in `~/radscheduler/api/.env` with:
-  - `DATABASE_URL` - PostgreSQL connection string
+  - `DATABASE_URL` - PostgreSQL connection string (MUST point to AWS RDS `radorderpad-main-db`)
   - `TWILIO_ACCOUNT_SID` - Twilio account SID
   - `TWILIO_AUTH_TOKEN` - Twilio auth token
   - `TWILIO_PHONE_NUMBER` - Twilio phone number
   - `PORT` - Server port (default: 3010)
+  - `USE_MOCK_RIS` - Set to `false` for production (uses real Mock RIS locations)
+  - `QIE_API_URL` - Set to `http://10.0.1.211:8082` (QIE server internal IP)
+
+### Example .env Configuration
+
+```bash
+# Database (REQUIRED - must use AWS RDS)
+DATABASE_URL=postgresql://postgres:<password>@<rds-host>:5432/radorder_main?sslmode=no-verify
+
+# Server
+PORT=3010
+NODE_ENV=development
+
+# Twilio (REQUIRED)
+TWILIO_ACCOUNT_SID=<your-twilio-account-sid>
+TWILIO_AUTH_TOKEN=<your-twilio-auth-token>
+TWILIO_PHONE_NUMBER=<your-twilio-phone-number>
+
+# Mock RIS Integration (REQUIRED - without these, shows hardcoded "Main Campus Imaging")
+USE_MOCK_RIS=false
+QIE_API_URL=http://<qie-server-ip>:8082
+
+# Auth
+JWT_SECRET=<your-jwt-secret>
+
+# Other APIs
+ANTHROPIC_API_KEY=<your-anthropic-key>
+VOICE_SYSTEM_API_KEY=<your-voice-api-key>
+ORDER_WEBHOOK_SECRET=<your-webhook-secret>
+RETELL_API_KEY=<your-retell-key>
+```
+
+**CRITICAL**: If `USE_MOCK_RIS` is not set to `false`, SMS messages will show hardcoded mock locations ("Main Campus Imaging") instead of real Radiology Regional locations.
 
 ## Deployment Fixes Applied
 
