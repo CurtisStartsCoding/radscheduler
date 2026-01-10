@@ -9,7 +9,7 @@
 
 ## 🎯 What RadScheduler Does
 
-RadScheduler enables patients to self-schedule their radiology imaging appointments through a HIPAA-compliant SMS conversation flow. It integrates with your existing RadOrderPad and RIS systems via QIE (Qvera Interface Engine).
+RadScheduler enables patients to self-schedule their radiology imaging appointments through a HIPAA-compliant SMS conversation flow. It integrates with your existing RadOrderPad and RIS systems.
 
 ### Core Functionality
 1. **Receives webhook** from RadOrderPad when new imaging order created
