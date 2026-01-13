@@ -1,0 +1,193 @@
+{
+  "branchName": "research/patent-completeness-review",
+  "projectName": "RadScheduler/RadOrderPad Patent Completeness Analysis",
+  "researchConfig": {
+    "patentsLocation": "C:/Apps/radorderpad-api/final-documentation/patents",
+    "radschedulerRepo": "C:/apps/radscheduler",
+    "radorderpadRepo": "C:/Apps/radorderpad-api",
+    "outputDirectory": "./research-output",
+    "doNotModify": ["C:/Apps/radorderpad-api/final-documentation/patents"],
+    "principle": "Code and git history are source of truth. Documentation supplements. Fresh eyes - no confirmation bias."
+  },
+  "userStories": [
+    {
+      "id": "RS-001",
+      "title": "Read all 4 existing provisional patents",
+      "description": "Read each provisional patent filing. Extract: title, claims, technical innovations described. This is the BASELINE of what's already protected.",
+      "acceptanceCriteria": [
+        "Read C:/Apps/radorderpad-api/final-documentation/patents/Provisional_1_Multi_Protocol_Integration.md",
+        "Read C:/Apps/radorderpad-api/final-documentation/patents/Provisional_2_Two_Stage_Followup.md",
+        "Read C:/Apps/radorderpad-api/final-documentation/patents/Provisional_3_RadScheduler_SMS_Scheduling.md",
+        "Read C:/Apps/radorderpad-api/final-documentation/patents/Provisional_4_AI_Coding_EMR_State_Management.md",
+        "Read C:/Apps/radorderpad-api/final-documentation/patents/README.md for filing status",
+        "Create 01_existing_patents.md with structured summary of each patent's scope",
+        "File <6000 tokens"
+      ],
+      "priority": 1,
+      "passes": true,
+      "outputFile": "research-output/01_existing_patents.md"
+    },
+    {
+      "id": "RS-002",
+      "title": "RadScheduler git log - all commits categorized",
+      "description": "Full git history analysis. Categorize every commit by feature area. Identify innovations.",
+      "acceptanceCriteria": [
+        "Run: git -C 'C:/apps/radscheduler' log --format='%h|%s|%ad' --date=short",
+        "Categorize commits: SMS flow, QIE integration, webhooks, security, docs, other",
+        "Flag any commits mentioning: AI, intelligent, safety, equipment, failover, provider",
+        "Note the recent commit a245138 (multi-provider SMS failover)",
+        "Create 02_radscheduler_commits.md",
+        "File <5000 tokens"
+      ],
+      "priority": 2,
+      "passes": true,
+      "outputFile": "research-output/02_radscheduler_commits.md"
+    },
+    {
+      "id": "RS-003",
+      "title": "RadOrderPad-api git log - find AI/validation innovations",
+      "description": "Search RadOrderPad git history for AI validation, coding, HL7 segment builders - these feed into RadScheduler.",
+      "acceptanceCriteria": [
+        "Run: git -C 'C:/Apps/radorderpad-api' log --oneline -150",
+        "Search for commits with: validation, AI, Claude, coding, HL7, segment, context",
+        "Identify the HL7 segment builders (AL1, OBX) mentioned in intelligent-scheduling-plan",
+        "Create 03_radorderpad_commits.md",
+        "File <5000 tokens"
+      ],
+      "priority": 3,
+      "passes": true,
+      "outputFile": "research-output/03_radorderpad_commits.md"
+    },
+    {
+      "id": "RS-004",
+      "title": "Read intelligent-scheduling-plan.md in full",
+      "description": "This is the key unimplemented feature. Read the entire 864-line document. Extract every technical innovation described.",
+      "acceptanceCriteria": [
+        "Read C:/apps/radscheduler/docs/intelligent-scheduling-plan.md completely",
+        "List each sub-phase (1-5) and what it does",
+        "Extract specific technical innovations: safety checks, equipment DB, AI prompts, etc.",
+        "Note any code snippets that show novel approaches",
+        "Create 04_intelligent_scheduling_innovations.md",
+        "File <7000 tokens"
+      ],
+      "priority": 4,
+      "passes": true,
+      "outputFile": "research-output/04_intelligent_scheduling_innovations.md"
+    },
+    {
+      "id": "RS-005",
+      "title": "Analyze multi-provider SMS failover code",
+      "description": "Read the actual code for the SMS failover feature (commit a245138). Document the technical approach.",
+      "acceptanceCriteria": [
+        "Run: git -C 'C:/apps/radscheduler' show a245138 --stat",
+        "Read the changed files from that commit",
+        "Document: error classification logic, failover triggers, sticky sender, per-org pools",
+        "Assess novelty: Is error-based failover routing novel?",
+        "Create 05_sms_failover_analysis.md",
+        "File <4000 tokens"
+      ],
+      "priority": 5,
+      "passes": true,
+      "outputFile": "research-output/05_sms_failover_analysis.md"
+    },
+    {
+      "id": "RS-006",
+      "title": "Read SMS conversation state machine code",
+      "description": "Read the actual implementation of SMS conversation handling. Compare to Patent #3 claims.",
+      "acceptanceCriteria": [
+        "Find and read: api/src/services/sms-conversation.js or similar",
+        "Document: states, transitions, consent flow, session management",
+        "Compare to Provisional #3 claims - what's in code but not in patent?",
+        "Create 06_sms_statemachine_vs_patent3.md",
+        "File <5000 tokens"
+      ],
+      "priority": 6,
+      "passes": true,
+      "outputFile": "research-output/06_sms_statemachine_vs_patent3.md"
+    },
+    {
+      "id": "RS-007",
+      "title": "Read HL7 segment builders in RadOrderPad",
+      "description": "The intelligent scheduling plan references AL1/OBX segment builders. Find and read this code.",
+      "acceptanceCriteria": [
+        "Search RadOrderPad for: src/services/order/radiology/order-export/hl7-segments/",
+        "Read al1.ts (allergies), obx-labs.ts, obx-imaging.ts if they exist",
+        "Document how patient context is encoded into HL7",
+        "This is the SOURCE of data for intelligent scheduling safety checks",
+        "Create 07_hl7_segment_builders.md",
+        "File <5000 tokens"
+      ],
+      "priority": 7,
+      "passes": true,
+      "outputFile": "research-output/07_hl7_segment_builders.md"
+    },
+    {
+      "id": "RS-008",
+      "title": "Prior art: Patient safety in radiology scheduling",
+      "description": "Use Perplexity to research prior art for clinical safety checks in scheduling systems.",
+      "acceptanceCriteria": [
+        "Use Task tool with general-purpose agent for Perplexity",
+        "Search: 'contrast allergy checking radiology scheduling patents'",
+        "Search: 'renal function eGFR imaging safety screening patents'",
+        "Search: 'patient clinical context healthcare scheduling prior art'",
+        "Document relevant prior art and how the intelligent-scheduling approach differs",
+        "Create 08_prior_art_safety.md",
+        "File <6000 tokens"
+      ],
+      "priority": 8,
+      "passes": true,
+      "outputFile": "research-output/08_prior_art_safety.md"
+    },
+    {
+      "id": "RS-009",
+      "title": "Prior art: Equipment capability matching",
+      "description": "Use Perplexity to research prior art for equipment-based facility filtering.",
+      "acceptanceCriteria": [
+        "Use Task tool with general-purpose agent for Perplexity",
+        "Search: 'radiology equipment capability database scheduling patents'",
+        "Search: 'medical imaging facility filtering equipment requirements'",
+        "Search: 'CT MRI equipment matching patient scheduling'",
+        "Document relevant prior art and differentiation",
+        "Create 09_prior_art_equipment.md",
+        "File <6000 tokens"
+      ],
+      "priority": 9,
+      "passes": true,
+      "outputFile": "research-output/09_prior_art_equipment.md"
+    },
+    {
+      "id": "RS-010",
+      "title": "Prior art: AI prompt externalization",
+      "description": "Use Perplexity to research prior art for externalized AI prompts and A/B testing.",
+      "acceptanceCriteria": [
+        "Use Task tool with general-purpose agent for Perplexity",
+        "Search: 'AI prompt management externalization patents'",
+        "Search: 'LLM prompt versioning A/B testing prior art'",
+        "Search: 'PromptLayer Langfuse prompt management'",
+        "Determine if prompt externalization in intelligent-scheduling-plan is novel",
+        "Create 10_prior_art_prompts.md",
+        "File <5000 tokens"
+      ],
+      "priority": 10,
+      "passes": true,
+      "outputFile": "research-output/10_prior_art_prompts.md"
+    },
+    {
+      "id": "RS-011",
+      "title": "Gap analysis: Innovations vs Patent coverage",
+      "description": "Final synthesis. Cross-reference all findings. What's novel? What needs patent protection?",
+      "acceptanceCriteria": [
+        "Read all research-output files 01-10",
+        "Create matrix: [Innovation] | [Source] | [Existing Patent?] | [Prior Art?] | [Recommendation]",
+        "Specifically evaluate: clinical context safety, equipment filtering, SMS failover, AI prompts",
+        "Recommend which innovations to add to existing patents vs new filings",
+        "Note any filing deadlines (1-year provisional window)",
+        "Create 11_GAP_ANALYSIS.md",
+        "File <5000 tokens, actionable format"
+      ],
+      "priority": 11,
+      "passes": true,
+      "outputFile": "research-output/11_GAP_ANALYSIS.md"
+    }
+  ]
+}

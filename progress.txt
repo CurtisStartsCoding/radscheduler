@@ -1,0 +1,90 @@
+# Patent Completeness Research Progress Log
+# Each Ralph iteration appends findings below
+# DO NOT OVERWRITE - APPEND ONLY
+# Started: January 12, 2026
+
+
+## RS-001: Read all 4 existing provisional patents - COMPLETE
+- Read all 4 provisional patent specifications
+- Read README.md for filing status (4 provisionals, 15 innovations)
+- Created 01_existing_patents.md summarizing scope
+- Patent #1: Multi-protocol integration (4 innovations)
+- Patent #2: Two-stage follow-up (4 innovations)
+- Patent #3: SMS scheduling (8 innovations, some may be planned)
+- Patent #4: AI model selection + token mgmt (3 innovations)
+- FLAG: Verify Patent #3 claims vs actual code
+
+## RS-002: RadScheduler git log - all commits categorized - COMPLETE
+- Analyzed 55 commits from June 2025 to January 2026
+- Categorized: SMS Flow (16), QIE/HL7 (10), Webhooks (8), Security (5), Docs (12)
+- Flagged commit a245138: Multi-provider SMS failover (NOT in patents)
+- Flagged commit e7a44e8: Intelligent scheduling plan (docs only)
+- FINDING: No commits for equipment filtering or clinical safety validation
+- FINDING: Patent #3 claims may describe PLANNED features, not implemented
+
+## RS-003: RadOrderPad-api git log - COMPLETE
+- Analyzed 150 most recent commits
+- FOUND HL7 segment builders: al1.ts, obx-labs.ts, obx-imaging.ts
+- FOUND safety validation: commit 840e777 (100% detection rate)
+- Two-stage follow-up implemented (9050c7b, 6107ef0)
+- Pre-warming implemented (b9456cd, 7f2c82c)
+- HL7 segments exist as DATA SOURCE for safety checks
+
+## RS-004: Read intelligent-scheduling-plan.md - COMPLETE
+- Document is 865 lines describing UNIMPLEMENTED features
+- 5 Phases: QIE context forwarding, safety checks, equipment DB, AI analysis, SMS integration
+- CRITICAL: Document explicitly states 'GAP: Currently not forwarding AL1/OBX data'
+- Patent #3 claims these features as if implemented - BUT THEY ARE NOT
+- Externalized prompts with A/B testing: NOT in any patent
+
+## RS-005: Multi-provider SMS failover code analysis - COMPLETE
+- Commit a245138: 14 files, 6164 insertions
+- Error classification: FAILOVER_ERRORS vs NO_FAILOVER_ERRORS
+- Sticky sender: Hash-based consistent number per recipient
+- Per-org phone pools from organization_settings table
+- NOT in any existing patent - potential gap
+
+## RS-006: SMS state machine vs Patent #3 - COMPLETE
+- States implemented: CONSENT_PENDING, CHOOSING_LOCATION, CHOOSING_TIME, CONFIRMED, etc
+- Innovations 1-4 MATCH: state machine, consolidation, multi-procedure, modality filter
+- Innovations 5-8 GAP: safety validation, equipment DB, AI features NOT implemented
+- COORDINATOR_REVIEW state declared but not used
+- Unprotected features: SMS failover, sticky sender, per-org pools, async HL7
+
+## RS-007: HL7 segment builders in RadOrderPad - COMPLETE
+- AL1 builder: Allergy segments with MC type for contrast
+- OBX-labs builder: LOINC-coded lab values (eGFR 33914-3, creatinine 2160-0)
+- OBX-imaging builder: Prior imaging with study dates and contrast flags
+- Data source EXISTS but RadScheduler does NOT consume it
+- Confirms GAP: 'Currently not forwarding AL1/OBX data to webhook'
+
+## RS-008: Prior art - Patient safety in radiology scheduling - COMPLETE
+- Searched: contrast allergy CDS, eGFR screening, radiology scheduling patents
+- Found: Epic BPA, ESR iGuide, ACR/ESUR guidelines, POC testing
+- Key finding: Prior art operates at ORDER ENTRY or DAY-OF-EXAM
+- NOVEL: Applying safety checks during PATIENT SMS SELF-SCHEDULING
+- NOVEL: Automatic COORDINATOR_REVIEW routing
+
+## RS-009: Prior art - Equipment capability matching - COMPLETE
+- Searched: radiology equipment databases, scheduling optimization
+- Found: Marketing DBs (RadiologyData), capacity allocation (MDP models), RIS/PACS
+- Key finding: Prior art tracks equipment INVENTORY, not CAPABILITY matching
+- NOVEL: Pattern-based procedure-to-equipment matching rules
+- NOVEL: Granular capability DB (slice count, field strength, cardiac)
+
+## RS-010: Prior art - AI prompt externalization - COMPLETE
+- Searched: LLM prompt management, versioning, A/B testing
+- Found: Langfuse, PromptLayer, Braintrust, LangSmith, Maxim AI
+- Key finding: Prompt externalization is STANDARD INDUSTRY PRACTICE
+- NOT NOVEL: Identical features in multiple commercial products
+- Recommendation: Do NOT pursue patent for prompt externalization alone
+
+## RS-011: Gap analysis - Innovations vs Patent coverage - COMPLETE
+- Synthesized all 10 previous research files
+- Created innovation matrix: 15 innovations analyzed
+- Identified: 4 claimed but NOT implemented
+- Identified: 4 implemented but NOT claimed
+- Key action: Amend Patent #3 with SMS failover features
+- Key finding: Do NOT patent prompt externalization (prior art)
+
+=== ALL 11 STORIES COMPLETE ===
