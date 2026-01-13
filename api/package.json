@@ -9,7 +9,9 @@
     "seed:demo": "node scripts/seed-demo.js",
     "db:reset": "node scripts/reset-db.js",
     "test:load": "node scripts/load-test.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage"
   },
   "dependencies": {
     "axios": "^1.10.0",
@@ -28,6 +30,19 @@
     "winston": "^3.11.0"
   },
   "devDependencies": {
+    "jest": "^29.7.0",
     "nodemon": "^3.0.1"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "testMatch": [
+      "**/__tests__/**/*.test.js"
+    ],
+    "collectCoverageFrom": [
+      "src/**/*.js",
+      "!src/**/__tests__/**"
+    ],
+    "coverageDirectory": "coverage",
+    "verbose": true
   }
 }

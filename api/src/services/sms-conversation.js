@@ -7,6 +7,17 @@ const { logSMSInteraction, MESSAGE_TYPES, CONSENT_STATUS } = require('./sms-audi
 const risClient = require('./ris-api-client');
 
 /**
+ * Helper to send SMS with organization context from conversation
+ * @param {string} phoneNumber - Recipient phone
+ * @param {string} message - Message content
+ * @param {Object} [conversation] - Conversation object containing organization_id
+ */
+async function sendConversationSMS(phoneNumber, message, conversation = null) {
+  const organizationId = conversation?.organization_id || null;
+  return sendSMS(phoneNumber, message, { organizationId });
+}
+
+/**
  * SMS Conversation State Machine
  * Manages multi-step SMS scheduling conversations
  * State flow: CONSENT_PENDING → CHOOSING_LOCATION → CHOOSING_TIME → CONFIRMED
@@ -44,18 +55,22 @@ async function startConversation(phoneNumber, orderData) {
     // Check if patient has consent
     const consented = await hasConsent(phoneNumber);
 
+    // Extract organization_id from orderData (passed from webhook)
+    const organizationId = orderData.organizationId || null;
+
     // Create conversation record
     const result = await pool.query(
       `INSERT INTO sms_conversations
-       (phone_hash, encrypted_phone, state, order_data, expires_at)
-       VALUES ($1, $2, $3, $4, $5)
+       (phone_hash, encrypted_phone, state, order_data, expires_at, organization_id)
+       VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING *`,
       [
         phoneHash,
         encryptedPhone,
         consented ? STATES.CHOOSING_LOCATION : STATES.CONSENT_PENDING,
         JSON.stringify(orderData),
-        expiresAt
+        expiresAt,
+        organizationId
       ]
     );
 

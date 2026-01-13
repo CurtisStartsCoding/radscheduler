@@ -1,107 +1,141 @@
-const twilio = require('twilio');
+/**
+ * Notification Service
+ *
+ * Provides SMS notification capabilities using the multi-provider SMS service.
+ * Maintains backward compatibility with existing code while enabling
+ * per-organization configuration and automatic failover.
+ */
+
+const { SMSService, getSMSService, sendSMS: smsSend } = require('./sms');
 const logger = require('../utils/logger');
 const { hashPhoneNumber, getPhoneLast4 } = require('../utils/phone-hash');
 
-class NotificationService {
-  constructor() {
-    if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN) {
-      this.client = twilio(
-        process.env.TWILIO_ACCOUNT_SID,
-        process.env.TWILIO_AUTH_TOKEN
-      );
-      this.fromNumber = process.env.TWILIO_PHONE_NUMBER;
-      this.enabled = true;
-    } else {
-      logger.warn('Twilio credentials not configured, SMS will be logged only');
-      this.enabled = false;
+// Database connection (injected or null for legacy mode)
+let dbConnection = null;
+
+/**
+ * Set the database connection for the notification service
+ * @param {Object} db - Database connection pool
+ */
+function setDatabase(db) {
+  dbConnection = db;
+}
+
+/**
+ * Send SMS message
+ *
+ * @param {string} to - Recipient phone number
+ * @param {string} message - Message content
+ * @param {Object} [options] - Additional options
+ * @param {string} [options.organizationId] - Organization UUID for multi-tenant config
+ * @param {string} [options.from] - Override sender number
+ * @returns {Promise<Object>}
+ */
+async function sendSMS(to, message, options = {}) {
+  try {
+    // Validation
+    if (!to) {
+      logger.error('SMS send failed: No recipient phone number provided');
+      throw new Error('No recipient phone number provided');
     }
-  }
 
-  async sendSMS(to, message) {
-    try {
-      // Add validation for the 'to' parameter
-      if (!to) {
-        logger.error('SMS send failed: No recipient phone number provided (to parameter is empty/null)');
-        throw new Error('No recipient phone number provided');
-      }
+    if (typeof to !== 'string' || to.trim() === '') {
+      logger.error('SMS send failed: Invalid recipient phone number format', {
+        type: typeof to,
+        isEmpty: to === '' || (typeof to === 'string' && to.trim() === '')
+      });
+      throw new Error('Invalid recipient phone number format');
+    }
 
-      if (typeof to !== 'string' || to.trim() === '') {
-        logger.error('SMS send failed: Invalid recipient phone number format', {
-          type: typeof to,
-          isEmpty: to === '' || (typeof to === 'string' && to.trim() === '')
-        });
-        throw new Error('Invalid recipient phone number format');
-      }
+    // Log attempt (HIPAA compliant)
+    logger.info('Attempting to send SMS', {
+      phoneHash: hashPhoneNumber(to),
+      phoneLast4: getPhoneLast4(to),
+      messageLength: message ? message.length : 0,
+      organizationId: options.organizationId || 'default'
+    });
 
-      // Log the parameters being sent to Twilio for debugging (HIPAA compliant)
-      logger.info('Attempting to send SMS', {
+    // Use new SMS service
+    const result = await smsSend(to, message, {
+      db: dbConnection,
+      organizationId: options.organizationId,
+      from: options.from
+    });
+
+    if (result.status === 'failed') {
+      logger.error('SMS send failed', {
         phoneHash: hashPhoneNumber(to),
         phoneLast4: getPhoneLast4(to),
-        from: this.fromNumber,
-        messageLength: message ? message.length : 0,
-        enabled: this.enabled
+        errorCode: result.errorCode,
+        errorMessage: result.errorMessage,
+        provider: result.provider
       });
-
-      if (!this.enabled) {
-        logger.info('SMS (simulated)', {
-          phoneHash: hashPhoneNumber(to),
-          phoneLast4: getPhoneLast4(to),
-          messageLength: message ? message.length : 0
-        });
-        return { sid: 'SIMULATED_' + Date.now(), status: 'sent' };
-      }
-
-      const result = await this.client.messages.create({
-        body: message,
-        from: this.fromNumber,
-        to: to
-      });
-
-      logger.info('SMS sent successfully', {
-        sid: result.sid,
-        phoneHash: hashPhoneNumber(to),
-        phoneLast4: getPhoneLast4(to)
-      });
-
-      return result;
-    } catch (error) {
-      logger.error('SMS send failed', {
-        error: error.message,
-        phoneHash: hashPhoneNumber(to),
-        phoneLast4: getPhoneLast4(to)
-      });
-
-      throw error;
+      throw new Error(result.errorMessage || 'SMS send failed');
     }
-  }
 
-  async sendBulkSMS(recipients, message) {
-    const results = [];
-    
-    for (const recipient of recipients) {
-      try {
-        const result = await this.sendSMS(recipient, message);
-        results.push({ recipient, success: true, result });
-      } catch (error) {
-        results.push({ recipient, success: false, error: error.message });
-      }
-      
-      // Rate limiting
-      await new Promise(resolve => setTimeout(resolve, 100));
-    }
-    
-    return results;
+    logger.info('SMS sent successfully', {
+      sid: result.sid,
+      phoneHash: hashPhoneNumber(to),
+      phoneLast4: getPhoneLast4(to),
+      provider: result.provider,
+      fromNumber: result.fromNumber,
+      failedOver: result.failedOver || false
+    });
+
+    return {
+      sid: result.sid,
+      status: result.status,
+      provider: result.provider,
+      fromNumber: result.fromNumber
+    };
+  } catch (error) {
+    logger.error('SMS send failed', {
+      error: error.message,
+      phoneHash: hashPhoneNumber(to),
+      phoneLast4: getPhoneLast4(to)
+    });
+    throw error;
   }
 }
 
-// Create a singleton instance
-const notificationService = new NotificationService();
+/**
+ * Send bulk SMS messages
+ *
+ * @param {string[]} recipients - Array of phone numbers
+ * @param {string} message - Message content
+ * @param {Object} [options] - Additional options
+ * @param {string} [options.organizationId] - Organization UUID
+ * @returns {Promise<Array<{recipient: string, success: boolean, result?: Object, error?: string}>>}
+ */
+async function sendBulkSMS(recipients, message, options = {}) {
+  const results = [];
+
+  for (const recipient of recipients) {
+    try {
+      const result = await sendSMS(recipient, message, options);
+      results.push({ recipient, success: true, result });
+    } catch (error) {
+      results.push({ recipient, success: false, error: error.message });
+    }
+
+    // Rate limiting - 100ms between messages
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+
+  return results;
+}
+
+/**
+ * Get SMS service instance
+ * @returns {SMSService}
+ */
+function getService() {
+  return getSMSService(dbConnection);
+}
 
 module.exports = {
-  sendSMS: async (to, message) => {
-    return notificationService.sendSMS(to, message);
-  },
-  sendBulkSMS: async (recipients, message) => {
-    return notificationService.sendBulkSMS(recipients, message);
-  }
+  sendSMS,
+  sendBulkSMS,
+  setDatabase,
+  getService
 };
