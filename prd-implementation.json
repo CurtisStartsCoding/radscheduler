@@ -1,0 +1,237 @@
+{
+  "branchName": "feature/intelligent-scheduling",
+  "projectName": "Intelligent Scheduling Implementation",
+  "implementationConfig": {
+    "sourceSpec": "C:/apps/radscheduler/docs/intelligent-scheduling-plan.md",
+    "testAfterEachPhase": true,
+    "model": "opus"
+  },
+  "userStories": [
+    {
+      "id": "IMP-001",
+      "title": "Create equipment database tables",
+      "description": "Create the scheduling_locations and scheduling_equipment tables in radorder_main database. These store equipment capabilities for filtering.",
+      "acceptanceCriteria": [
+        "Create api/db/migrations/006_add_equipment_tables.sql",
+        "Include scheduling_locations table with: location_id, name, address, city, state, phone, timezone, active",
+        "Include scheduling_equipment table with CT fields: ct_slice_count, ct_has_cardiac, ct_has_contrast_injector",
+        "Include MRI fields: mri_field_strength, mri_bore_width_cm, mri_has_cardiac, mri_wide_bore",
+        "Include general fields: max_patient_weight_kg, has_bariatric_table",
+        "Include proper indexes",
+        "Test: Migration runs without errors"
+      ],
+      "priority": 1,
+      "passes": true,
+      "outputFiles": ["api/db/migrations/006_add_equipment_tables.sql"]
+    },
+    {
+      "id": "IMP-002",
+      "title": "Create equipment rules service",
+      "description": "Implement rules engine that maps procedure descriptions to equipment requirements.",
+      "acceptanceCriteria": [
+        "Create api/src/services/equipment-rules.js",
+        "Implement EQUIPMENT_RULES object with patterns for CT, MRI, Mammography",
+        "CT rules: WITH CONTRAST requires injector, CARDIAC requires 64+ slices",
+        "MRI rules: CARDIAC requires cardiac capability, 3T requires field_strength >= 3.0, claustrophobic/bariatric requires wide_bore",
+        "Implement getEquipmentRequirements(order) function",
+        "Implement buildEquipmentWhereClause(requirements, modality) function",
+        "Export module",
+        "Test: Rules match expected patterns"
+      ],
+      "priority": 2,
+      "passes": true,
+      "outputFiles": ["api/src/services/equipment-rules.js"]
+    },
+    {
+      "id": "IMP-003",
+      "title": "Create equipment service",
+      "description": "Implement service that queries equipment database and filters locations by capability.",
+      "acceptanceCriteria": [
+        "Create api/src/services/equipment-service.js",
+        "Implement filterLocationsByCapability(allLocations, order) function",
+        "Query scheduling_equipment table with requirements from equipment-rules",
+        "Return only locations whose equipment meets requirements",
+        "Handle case where no locations meet requirements",
+        "Test: Filtering works correctly"
+      ],
+      "priority": 3,
+      "passes": true,
+      "outputFiles": ["api/src/services/equipment-service.js"]
+    },
+    {
+      "id": "IMP-004",
+      "title": "Create scheduling safety service",
+      "description": "Implement safety validation that checks patient context for contraindications.",
+      "acceptanceCriteria": [
+        "Create api/src/services/scheduling-safety.js",
+        "Implement checkSchedulingSafety(order) function",
+        "Check contrast allergy from patientContext.allergies (type MC or allergen matches contrast/iodine)",
+        "Severe allergy (SV) = block, mild/moderate = warning",
+        "Check renal function from patientContext.labs (eGFR < 30 = block, 30-45 = warning)",
+        "Check recent contrast from patientContext.priorImaging (< 7 days = warning with minScheduleDate)",
+        "Implement orderRequiresContrast(order) helper",
+        "Return { warnings, blocks, canProceed, minScheduleDate }",
+        "Test: All safety scenarios handled correctly"
+      ],
+      "priority": 4,
+      "passes": true,
+      "outputFiles": ["api/src/services/scheduling-safety.js"]
+    },
+    {
+      "id": "IMP-005",
+      "title": "Create duration modifiers service",
+      "description": "Implement multi-factor duration calculation: Base + Equipment_Modifier + Patient_Factors.",
+      "acceptanceCriteria": [
+        "Create api/src/services/duration-calculator.js",
+        "Implement calculateDuration(order, equipment, patientContext) function",
+        "Base duration from order.estimatedDuration or procedure lookup",
+        "Equipment modifier: 3T MRI = 0.7x, 64+ slice CT = 0.85x",
+        "Patient modifiers: claustrophobic = +15min, mobility issues = +10min, bariatric = +10min",
+        "Return { totalDuration, breakdown: { base, equipmentModifier, patientModifiers } }",
+        "Test: Duration calculation works for various scenarios"
+      ],
+      "priority": 5,
+      "passes": true,
+      "outputFiles": ["api/src/services/duration-calculator.js"]
+    },
+    {
+      "id": "IMP-006",
+      "title": "Update webhook handler to accept patientContext",
+      "description": "Modify order webhook to receive and store patientContext from QIE.",
+      "acceptanceCriteria": [
+        "Update api/src/routes/order-webhook.js",
+        "Accept patientContext field in webhook payload",
+        "patientContext contains: allergies[], labs[], priorImaging[]",
+        "Store patientContext in order_data when creating conversation",
+        "Validate patientContext structure (optional field, validate if present)",
+        "Test: Webhook accepts and stores patientContext"
+      ],
+      "priority": 6,
+      "passes": true,
+      "outputFiles": ["api/src/routes/order-webhook.js"]
+    },
+    {
+      "id": "IMP-007",
+      "title": "Integrate safety checks into SMS conversation",
+      "description": "Add safety validation before showing locations to patient.",
+      "acceptanceCriteria": [
+        "Update api/src/services/sms-conversation.js",
+        "Import scheduling-safety service",
+        "Call checkSchedulingSafety(order) when patient selects order",
+        "If blocks exist: Send block message, transition to COORDINATOR_REVIEW state",
+        "If warnings exist: Send warning messages, continue with scheduling",
+        "Apply minScheduleDate when querying slots",
+        "Test: Safety blocks and warnings work correctly"
+      ],
+      "priority": 7,
+      "passes": true,
+      "outputFiles": ["api/src/services/sms-conversation.js"]
+    },
+    {
+      "id": "IMP-008",
+      "title": "Integrate equipment filtering into SMS conversation",
+      "description": "Filter locations by equipment capability before showing to patient.",
+      "acceptanceCriteria": [
+        "Update api/src/services/sms-conversation.js",
+        "Import equipment-service",
+        "After getting locations from RIS, call filterLocationsByCapability()",
+        "If no capable locations: Send message, transition to COORDINATOR_REVIEW",
+        "Only show capable locations to patient",
+        "Test: Equipment filtering works in conversation flow"
+      ],
+      "priority": 8,
+      "passes": true,
+      "outputFiles": ["api/src/services/sms-conversation.js"]
+    },
+    {
+      "id": "IMP-009",
+      "title": "Integrate duration calculation into slot display",
+      "description": "Show accurate duration per location based on equipment.",
+      "acceptanceCriteria": [
+        "Update api/src/services/sms-conversation.js",
+        "Import duration-calculator",
+        "For each capable location, calculate duration using their equipment specs",
+        "Display duration in slot options: 'Downtown 3T - Tue 9am (28 min)'",
+        "Use calculated duration when querying RIS for slots",
+        "Test: Durations shown are location-specific"
+      ],
+      "priority": 9,
+      "passes": true,
+      "outputFiles": ["api/src/services/sms-conversation.js"]
+    },
+    {
+      "id": "IMP-010",
+      "title": "Add COORDINATOR_REVIEW state handling",
+      "description": "Implement the coordinator review state for blocked patients.",
+      "acceptanceCriteria": [
+        "Update sms-conversation.js state machine",
+        "Add COORDINATOR_REVIEW as valid state",
+        "When entering COORDINATOR_REVIEW: log reason, store safety data",
+        "Send appropriate message to patient",
+        "Patient can still reply STOP to opt out",
+        "Admin API can query conversations in COORDINATOR_REVIEW state",
+        "Test: COORDINATOR_REVIEW state works correctly"
+      ],
+      "priority": 10,
+      "passes": true,
+      "outputFiles": ["api/src/services/sms-conversation.js"]
+    },
+    {
+      "id": "IMP-011",
+      "title": "Create comprehensive test suite",
+      "description": "Write tests for all new services and integration points.",
+      "acceptanceCriteria": [
+        "Create api/tests/scheduling-safety.test.js",
+        "Create api/tests/equipment-rules.test.js",
+        "Create api/tests/equipment-service.test.js",
+        "Create api/tests/duration-calculator.test.js",
+        "Test safety scenarios: severe allergy blocks, mild warns, low eGFR blocks, recent contrast warns",
+        "Test equipment rules: CT contrast, cardiac CT, MRI 3T, wide-bore",
+        "Test duration calculation: base + modifiers",
+        "All tests pass"
+      ],
+      "priority": 11,
+      "passes": true,
+      "outputFiles": [
+        "api/tests/scheduling-safety.test.js",
+        "api/tests/equipment-rules.test.js",
+        "api/tests/equipment-service.test.js",
+        "api/tests/duration-calculator.test.js"
+      ]
+    },
+    {
+      "id": "IMP-012",
+      "title": "Seed equipment database with test data",
+      "description": "Create seed script with sample locations and equipment for testing.",
+      "acceptanceCriteria": [
+        "Create api/db/seeds/equipment-seed.sql",
+        "Add 3-4 test locations (Downtown, Northside, Regional)",
+        "Downtown: 3T MRI, 64-slice CT with contrast injector",
+        "Northside: 1.5T wide-bore MRI, 16-slice CT",
+        "Regional: 3T MRI with cardiac, 256-slice CT",
+        "Include realistic equipment specs",
+        "Test: Seed runs and data is queryable"
+      ],
+      "priority": 12,
+      "passes": true,
+      "outputFiles": ["api/db/seeds/equipment-seed.sql"]
+    },
+    {
+      "id": "IMP-013",
+      "title": "End-to-end integration test",
+      "description": "Test complete flow from webhook to SMS with safety and equipment filtering.",
+      "acceptanceCriteria": [
+        "Create api/tests/integration/intelligent-scheduling.test.js",
+        "Test: Order with contrast allergy triggers safety warning",
+        "Test: Order with severe allergy blocks and routes to coordinator",
+        "Test: Cardiac CT only shows locations with capable equipment",
+        "Test: Duration varies by location equipment",
+        "Test: MinScheduleDate applied for recent contrast",
+        "All integration tests pass"
+      ],
+      "priority": 13,
+      "passes": true,
+      "outputFiles": ["api/tests/integration/intelligent-scheduling.test.js"]
+    }
+  ]
+}
