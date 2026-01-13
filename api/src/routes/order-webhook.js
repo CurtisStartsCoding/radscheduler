@@ -7,7 +7,7 @@ const { hashPhoneNumber } = require('../utils/phone-hash');
 
 /**
  * Order Webhook Handler
- * Receives webhooks from Mock RIS when orders enter pending queue
+ * Receives webhooks from Mock RIS/QIE when orders enter pending queue
  * This is the TRIGGER POINT for the entire SMS scheduling workflow
  *
  * CRITICAL SECURITY: Validates webhook secret to prevent unauthorized triggers
@@ -52,8 +52,68 @@ function validateWebhookAuth(req, res, next) {
 }
 
 /**
+ * Validate patientContext structure if present
+ * @param {Object} patientContext - Optional patient context from QIE
+ * @returns {Object} - { valid: boolean, errors: string[] }
+ */
+function validatePatientContext(patientContext) {
+  if (!patientContext) {
+    return { valid: true, errors: [] };
+  }
+
+  const errors = [];
+
+  // Validate allergies array if present
+  if (patientContext.allergies !== undefined) {
+    if (!Array.isArray(patientContext.allergies)) {
+      errors.push('patientContext.allergies must be an array');
+    } else {
+      patientContext.allergies.forEach((allergy, idx) => {
+        if (!allergy.allergen && !allergy.type) {
+          errors.push(`patientContext.allergies[${idx}] must have allergen or type`);
+        }
+      });
+    }
+  }
+
+  // Validate labs array if present
+  if (patientContext.labs !== undefined) {
+    if (!Array.isArray(patientContext.labs)) {
+      errors.push('patientContext.labs must be an array');
+    } else {
+      patientContext.labs.forEach((lab, idx) => {
+        if (!lab.name && !lab.code) {
+          errors.push(`patientContext.labs[${idx}] must have name or code`);
+        }
+        if (lab.value === undefined) {
+          errors.push(`patientContext.labs[${idx}] must have value`);
+        }
+      });
+    }
+  }
+
+  // Validate priorImaging array if present
+  if (patientContext.priorImaging !== undefined) {
+    if (!Array.isArray(patientContext.priorImaging)) {
+      errors.push('patientContext.priorImaging must be an array');
+    } else {
+      patientContext.priorImaging.forEach((imaging, idx) => {
+        if (!imaging.modality) {
+          errors.push(`patientContext.priorImaging[${idx}] must have modality`);
+        }
+        if (!imaging.date) {
+          errors.push(`patientContext.priorImaging[${idx}] must have date`);
+        }
+      });
+    }
+  }
+
+  return { valid: errors.length === 0, errors };
+}
+
+/**
  * POST /api/orders/webhook
- * Receive order from Mock RIS when it enters pending queue
+ * Receive order from Mock RIS/QIE when it enters pending queue
  *
  * Expected payload:
  * {
@@ -63,18 +123,23 @@ function validateWebhookAuth(req, res, next) {
  *   "modality": "CT",
  *   "priority": "routine",
  *   "orderDescription": "CT Chest with Contrast",
- *   "queuedAt": "2025-10-15T12:30:00Z"
+ *   "queuedAt": "2025-10-15T12:30:00Z",
+ *   "patientContext": {
+ *     "allergies": [{ "allergen": "Iodinated contrast", "type": "MC", "severity": "SV", "reaction": "Anaphylaxis" }],
+ *     "labs": [{ "name": "eGFR", "code": "33914-3", "value": "65", "units": "mL/min/1.73m2", "date": "2026-01-05" }],
+ *     "priorImaging": [{ "modality": "CT", "date": "2026-01-05", "hadContrast": true }]
+ *   }
  * }
  */
 router.post('/webhook', express.json(), validateWebhookAuth, async (req, res) => {
   try {
     const {
       orderId,
-      orderGroupId,         // NEW: for multi-procedure grouping
-      orderSequence,        // NEW: position in group
-      totalInGroup,         // NEW: total procedures
-      procedures,           // NEW: array of all procedures
-      estimatedDuration,    // NEW: total duration in minutes
+      orderGroupId,         // For multi-procedure grouping
+      orderSequence,        // Position in group
+      totalInGroup,         // Total procedures
+      procedures,           // Array of all procedures
+      estimatedDuration,    // Total duration in minutes
       patientId,
       patientMrn,           // Patient MRN from HL7 PID-3
       patientDob,           // Patient DOB from HL7 PID-7
@@ -86,7 +151,8 @@ router.post('/webhook', express.json(), validateWebhookAuth, async (req, res) =>
       orderDescription,     // Legacy field for backward compatibility
       procedureDescription, // Alternative field name
       queuedAt,
-      orderingPractice      // Practice name from HL7 MSH-3 (Sending Facility)
+      orderingPractice,     // Practice name from HL7 MSH-3 (Sending Facility)
+      patientContext        // NEW: Patient context from QIE (allergies, labs, priorImaging)
     } = req.body;
 
     // Validate required fields
@@ -102,13 +168,29 @@ router.post('/webhook', express.json(), validateWebhookAuth, async (req, res) =>
       });
     }
 
+    // Validate patientContext if present
+    const contextValidation = validatePatientContext(patientContext);
+    if (!contextValidation.valid) {
+      logger.warn('Invalid patientContext structure', {
+        orderId,
+        errors: contextValidation.errors
+      });
+      // Log warning but don't reject - continue without patientContext
+    }
+
     logger.info('Order webhook received from Mock RIS', {
       orderId,
       patientHash: hashPhoneNumber(patientPhone),
       modality,
       priority,
       queuedAt,
-      orderingPractice      // Practice name from HL7 MSH-3 (Sending Facility)
+      orderingPractice,
+      hasPatientContext: !!patientContext,
+      patientContextFields: patientContext ? {
+        allergies: patientContext.allergies?.length || 0,
+        labs: patientContext.labs?.length || 0,
+        priorImaging: patientContext.priorImaging?.length || 0
+      } : null
     });
 
     // Prepare order data for conversation with multi-procedure support
@@ -132,7 +214,9 @@ router.post('/webhook', express.json(), validateWebhookAuth, async (req, res) =>
       priority: priority || 'routine',
       orderDescription: orderDescription || procedureDescription || `${modality} exam`,
       queuedAt: queuedAt || new Date().toISOString(),
-      orderingPractice       // Practice name for SMS messages
+      orderingPractice,                      // Practice name for SMS messages
+      // NEW: Store patient context for safety checks
+      patientContext: contextValidation.valid ? patientContext : null
     };
 
     // Check if patient already has an active conversation
@@ -188,6 +272,7 @@ router.post('/webhook', express.json(), validateWebhookAuth, async (req, res) =>
       conversationId: conversation.id,
       orderId,
       isNewConversation: !wasQueued,
+      hasPatientContext: !!patientContext,
       timestamp: new Date().toISOString()
     });
   } catch (error) {
@@ -235,7 +320,8 @@ if (process.env.NODE_ENV !== 'production') {
         modality: req.body.modality || 'CT',
         priority: req.body.priority || 'routine',
         orderDescription: req.body.orderDescription || 'Test Order',
-        queuedAt: new Date().toISOString()
+        queuedAt: new Date().toISOString(),
+        patientContext: req.body.patientContext || null
       };
 
       if (!testOrderData.patientPhone) {
